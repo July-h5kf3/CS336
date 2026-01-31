@@ -19,6 +19,7 @@ from einops import rearrange, einsum
 from cs336_basics.Linear import Linear
 from cs336_basics.Embedding import Embedding
 from cs336_basics.RMSNorm import RMSNorm
+from cs336_basics.SwiGLU import SwiGLU
 
 def run_linear(
     d_in: int,
@@ -99,7 +100,12 @@ def run_swiglu(
     # swiglu.w1.weight.data = w1_weight
     # swiglu.w2.weight.data = w2_weight
     # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
+    SwiGLU_layer = SwiGLU(d_model)
+    SwiGLU_layer.W1.data = w1_weight
+    SwiGLU_layer.W2.data = w2_weight
+    SwiGLU_layer.W3.data = w3_weight
+    return SwiGLU_layer(in_features)
+    # raise NotImplementedError
 
 
 def run_scaled_dot_product_attention(
