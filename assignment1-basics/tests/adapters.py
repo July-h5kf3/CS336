@@ -18,6 +18,7 @@ from cs336_basics.BPE_tokenizer import BPETokenizer
 from einops import rearrange, einsum
 from cs336_basics.Linear import Linear
 from cs336_basics.Embedding import Embedding
+from cs336_basics.RMSNorm import RMSNorm
 
 def run_linear(
     d_in: int,
@@ -393,7 +394,10 @@ def run_rmsnorm(
         Float[Tensor,"... d_model"]: Tensor of with the same shape as `in_features` with the output of running
         RMSNorm of the `in_features`.
     """
-    raise NotImplementedError
+    RMSNorm_layer = RMSNorm(d_model,eps)
+    RMSNorm_layer.weight.data = weights
+    return RMSNorm_layer(in_features)
+    # raise NotImplementedError
 
 
 def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
