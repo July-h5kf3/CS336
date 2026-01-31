@@ -2,6 +2,9 @@
 
 这是我的 CS336 课程作业仓库，主要包含 assignment1 的实现与测试。
 
+下面是我的飞书云文档链接:
+https://nankai.feishu.cn/wiki/RZOXw0qeCi25PtkNT7RctOCEnJh
+
 ## 目录结构
 
 - `assignment1-basics/`：作业 1 的代码、测试与数据
