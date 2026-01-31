@@ -1,0 +1,37 @@
+# CS336 作业仓库
+
+这是我的 CS336 课程作业仓库，主要包含 assignment1 的实现与测试。
+
+## 目录结构
+
+- `assignment1-basics/`：作业 1 的代码、测试与数据
+
+## 环境与依赖
+
+建议使用 Python 3.10+。依赖以作业目录内的 `pyproject.toml` / `uv.lock` 为准。
+
+## 快速开始
+
+进入作业目录：
+
+```bash
+cd assignment1-basics
+```
+
+运行测试（示例）：
+
+```bash
+pytest -q
+```
+
+## 进度说明
+
+- [x] 1. Basics（完成时间：1.31）
+- [ ] 2. Systems（完成时间：待定）
+- [ ] 3. Scaling（完成时间：待定）
+- [ ] 4. Data（完成时间：待定）
+- [ ] 5. Alignment and Reasoning RL（完成时间：待定）
+
+## 备注
+
+如需复现实验结果或提交作业，请以课程要求为准。
