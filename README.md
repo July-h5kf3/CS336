@@ -27,6 +27,8 @@ pytest -q
 ## 进度说明
 
 - [x] 1. Basics（完成时间：1.31）
+![](fig/bpe.png)
+![](fig/tokenizer.png)
 - [ ] 2. Systems（完成时间：待定）
 - [ ] 3. Scaling（完成时间：待定）
 - [ ] 4. Data（完成时间：待定）
