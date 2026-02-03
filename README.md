@@ -41,6 +41,12 @@ pytest -q
 - [ ] 4. Data（完成时间：待定）
 - [ ] 5. Alignment and Reasoning RL（完成时间：待定）
 
+## 额外产出
+
+会在博客中更新一些额外的学习内容。
+
+博客地址:https://lorn3.bearblog.dev/
+
 ## 备注
 
 如需复现实验结果或提交作业，请以课程要求为准。
