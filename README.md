@@ -45,6 +45,8 @@ pytest -q
 
 会在博客中更新一些额外的学习内容。
 
+- [ ] 关于LLM中位置编码的思考
+
 博客地址:https://lorn3.bearblog.dev/
 
 ## 备注
