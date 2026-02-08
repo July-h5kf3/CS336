@@ -24,6 +24,7 @@ from cs336_basics.RotaryPositionalEmbedding import RotaryPositionalEmbedding
 from cs336_basics.CausalMultiHeadSelfAttention import CausalMultiHeadSelfAttention
 from cs336_basics.Transformer_Block import TransformerBlock
 from cs336_basics.Transformer import Transformer
+from cs336_basics.Cross_entropy import cross_entropy
 
 def run_linear(
     d_in: int,
@@ -533,7 +534,8 @@ def run_cross_entropy(
     Returns:
         Float[Tensor, ""]: The average cross-entropy loss across examples.
     """
-    raise NotImplementedError
+    return cross_entropy(inputs,targets)
+    # raise NotImplementedError
 
 
 def run_gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float) -> None:
