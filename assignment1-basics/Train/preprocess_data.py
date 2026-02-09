@@ -6,6 +6,7 @@ import os
 import yaml
 import numpy as np
 from typing import Iterator
+from tqdm import tqdm
 from cs336_basics.BPE_tokenizer import BPETokenizer
 
 
@@ -36,8 +37,17 @@ def preprocess(input_path: str, output_path: str, vocab_path: str, merges_path: 
     print(f"Vocabulary size: {len(tokenizer.vocab)}")
     
     print(f"Tokenizing {input_path}...")
-    # 使用 encode_iterable 进行流式编码
-    token_ids = list(tokenizer.encode_iterable(read_file_in_chunks(input_path)))
+    
+    # 获取文件大小用于进度条
+    file_size = os.path.getsize(input_path)
+    token_ids = []
+    
+    with tqdm(total=file_size, unit='B', unit_scale=True, desc="Tokenizing") as pbar:
+        for chunk in read_file_in_chunks(input_path):
+            chunk_ids = tokenizer.encode(chunk)
+            token_ids.extend(chunk_ids)
+            pbar.update(len(chunk.encode('utf-8')))
+    
     print(f"Total tokens: {len(token_ids)}")
     
     # 选择合适的 dtype
