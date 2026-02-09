@@ -28,6 +28,7 @@ from cs336_basics.Cross_entropy import cross_entropy
 from cs336_basics.Adamw import Adamw
 from cs336_basics.lr_scheduling import lr_cosine_schedule
 from cs336_basics.gradient_clip import gradient_clip
+from cs336_basics.data_utils import get_batch,save_checkpoint,load_checkpoint
 
 def run_linear(
     d_in: int,
@@ -227,7 +228,7 @@ def run_multihead_self_attention_with_rope(
     CausalMultiHeadSelfAttention_layer.W_v.W.data = v_proj_weight
     CausalMultiHeadSelfAttention_layer.W_o.W.data = o_proj_weight
     return CausalMultiHeadSelfAttention_layer(in_features,token_positions=token_positions)
-    raise NotImplementedError
+    # raise NotImplementedError
 
 
 def run_rope(
@@ -499,7 +500,8 @@ def run_get_batch(
         is the sampled input sequences, and the second tuple item is the corresponding
         language modeling labels.
     """
-    raise NotImplementedError
+    return get_batch(dataset,batch_size,context_length,device)
+    # raise NotImplementedError
 
 
 def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, " ..."]:
@@ -608,7 +610,8 @@ def run_save_checkpoint(
             we've completed.
         out (str | os.PathLike | BinaryIO | IO[bytes]): Path or file-like object to serialize the model, optimizer, and iteration to.
     """
-    raise NotImplementedError
+    save_checkpoint(model,optimizer,iteration,out)
+    # raise NotImplementedError
 
 
 def run_load_checkpoint(
@@ -629,7 +632,8 @@ def run_load_checkpoint(
     Returns:
         int: the previously-serialized number of iterations.
     """
-    raise NotImplementedError
+    return load_checkpoint(src,model,optimizer)
+    # raise NotImplementedError
 
 
 def get_tokenizer(
