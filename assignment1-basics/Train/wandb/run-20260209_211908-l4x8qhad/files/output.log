@@ -1,0 +1,14 @@
+WandB logging enabled.
+Using device: cpu
+Loading data from /home/acd66/project/CS336/assignment1-basics/tests/fixtures/tinystories_sample_5M.npy...
+Data shape: (1319329,), dtype: uint16
+Initializing model...
+Total trainable parameters: 23,089,664
+
+=== Training Config ===
+Batch size: 32
+Context length: 256
+Total steps: 40000
+LR: 1e-05 -> 0.001 (warmup: 500)
+Starting from step: 0
+Training:   0%|          | 11/40000 [03:20<168:22:15, 15.16s/it]Exception ignored in: <generator object tqdm.__iter__ at 0x7d5ad44d2f80>Exception ignored in sys.unraisablehook: <built-in function unraisablehook>

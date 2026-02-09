@@ -17,8 +17,8 @@ def get_batch(x, batch_size, context_length, device):
         x = torch.tensor(x)
     
     idx = torch.randint(0, len(x) - context_length, size=(batch_size,))
-    xb = torch.stack([x[i:i+context_length] for i in idx])
-    yb = torch.stack([x[i+1:i+context_length+1] for i in idx])
+    xb = torch.stack([x[i:i+context_length] for i in idx]).long()
+    yb = torch.stack([x[i+1:i+context_length+1] for i in idx]).long()
     xb, yb = xb.to(device), yb.to(device)
     return xb, yb
 

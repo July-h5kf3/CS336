@@ -1,0 +1,12 @@
+WandB logging enabled.
+Using device: cpu
+Loading data from /home/acd66/project/CS336/assignment1-basics/tests/fixtures/tinystories_sample_5M.npy...
+Data shape: (1319329,), dtype: uint16
+Initializing model...
+Traceback (most recent call last):
+  File "/home/acd66/project/CS336/assignment1-basics/Train/train.py", line 202, in <module>
+    train(args.config, args.resume)
+  File "/home/acd66/project/CS336/assignment1-basics/Train/train.py", line 90, in train
+    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+                                          ^^^^^^^^^^^^^^^^
+AttributeError: 'Transformer' object has no attribute 'parameters'

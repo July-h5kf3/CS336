@@ -6,8 +6,9 @@ import torch.nn as nn
 import torch
 from einops import rearrange, einsum
 
-class Transformer:
+class Transformer(nn.Module):
     def __init__(self,vocab_size,context_length,num_layers,d_model,num_heads,device):
+        super().__init__()
         self.TokenEmbedding = Embedding(vocab_size,d_model,device)
         self.TransformerBlocks = nn.ModuleList([
             TransformerBlock(d_model,num_heads,context_length,ffn_hidden_dim=None,device=device,use_rope=True)

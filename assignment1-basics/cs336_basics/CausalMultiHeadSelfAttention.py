@@ -67,10 +67,10 @@ class CausalMultiHeadSelfAttention(nn.Module):
         self.device = device
         self.theta = 10000.0
 
-        self.W_q = Linear(self.d_k,self.d_model,self.device)
-        self.W_k = Linear(self.d_k,self.d_model,self.device)
-        self.W_v = Linear(self.d_k,self.d_model,self.device)
-        self.W_o = Linear(self.d_model,self.d_k,self.device)
+        self.W_q = Linear(self.d_model, self.d_model, self.device)
+        self.W_k = Linear(self.d_model, self.d_model, self.device)
+        self.W_v = Linear(self.d_model, self.d_model, self.device)
+        self.W_o = Linear(self.d_model, self.d_model, self.device)
         if use_rope:
             self.use_rope = True
             self.RoPE = RotaryPositionalEmbedding(theta=self.theta,d_k = self.d_k, max_seq_len = seq_len, device = device)

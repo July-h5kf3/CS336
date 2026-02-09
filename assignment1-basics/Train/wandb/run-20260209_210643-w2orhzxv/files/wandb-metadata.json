@@ -1,0 +1,17 @@
+{
+  "os": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "python": "CPython 3.12.3",
+  "startedAt": "2026-02-09T13:06:43.249060Z",
+  "program": "/home/acd66/project/CS336/assignment1-basics/Train/train.py",
+  "codePath": "assignment1-basics/Train/train.py",
+  "codePathLocal": "train.py",
+  "git": {
+    "remote": "https://github.com/July-h5kf3/CS336.git",
+    "commit": "e72ad8220c959fedb7739281e760a75780229c93"
+  },
+  "email": "acd66@foxmail.com",
+  "root": "/home/acd66/project/CS336/assignment1-basics/Train",
+  "host": "mkdir",
+  "executable": "/home/acd66/project/CS336/assignment1-basics/.venv/bin/python3",
+  "writerId": "4ss97mvo36ej7n51acck76bu25au9jyb"
+}

@@ -1,0 +1,60 @@
+WandB logging enabled.
+Using device: cpu
+Loading data from /home/acd66/project/CS336/assignment1-basics/tests/fixtures/tinystories_sample_5M.npy...
+Data shape: (1319329,), dtype: uint16
+Initializing model...
+Total trainable parameters: 19,157,504
+
+=== Training Config ===
+Batch size: 32
+Context length: 256
+Total steps: 40000
+LR: 1e-5 -> 1e-3 (warmup: 500)
+Starting from step: 0
+Training:   0%|                                                                              | 0/40000 [00:00<?, ?it/s]
+Traceback (most recent call last):
+  File "/home/acd66/project/CS336/assignment1-basics/Train/train.py", line 202, in <module>
+    train(args.config, args.resume)
+  File "/home/acd66/project/CS336/assignment1-basics/Train/train.py", line 141, in train
+    logits = model.forward(xb)  # (batch, seq_len, vocab_size)
+             ^^^^^^^^^^^^^^^^^
+  File "/home/acd66/project/CS336/assignment1-basics/cs336_basics/Transformer.py", line 30, in forward
+    x = block(x,token_positions)
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/acd66/project/CS336/assignment1-basics/.venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/acd66/project/CS336/assignment1-basics/.venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/acd66/project/CS336/assignment1-basics/cs336_basics/Transformer_Block.py", line 17, in forward
+    attn_out = self.attention(x_norm,token_positions)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/acd66/project/CS336/assignment1-basics/.venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/acd66/project/CS336/assignment1-basics/.venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/acd66/project/CS336/assignment1-basics/cs336_basics/CausalMultiHeadSelfAttention.py", line 90, in forward
+    Q = self.W_q(x)
+        ^^^^^^^^^^^
+  File "/home/acd66/project/CS336/assignment1-basics/.venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/acd66/project/CS336/assignment1-basics/.venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/acd66/project/CS336/assignment1-basics/cs336_basics/Linear.py", line 13, in forward
+    return einsum(x,self.W,"... d_in,d_out d_in->... d_out")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/acd66/project/CS336/assignment1-basics/.venv/lib/python3.12/site-packages/einops/einops.py", line 939, in einsum
+    return get_backend(tensors[0]).einsum(pattern, *tensors)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/acd66/project/CS336/assignment1-basics/.venv/lib/python3.12/site-packages/einops/_backends.py", line 291, in einsum
+    return self.torch.einsum(pattern, *x)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/acd66/project/CS336/assignment1-basics/.venv/lib/python3.12/site-packages/torch/functional.py", line 407, in einsum
+    return _VF.einsum(equation, operands)  # type: ignore[attr-defined]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: einsum(): subscript a has size 32 for operand 1 which does not broadcast with previously seen size 512

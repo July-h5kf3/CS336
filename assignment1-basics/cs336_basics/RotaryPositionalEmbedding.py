@@ -39,8 +39,13 @@ class RotaryPositionalEmbedding(nn.Module):
         returns:
             x_rotated: ...,seq_len,d_k
         """
-        cos = self.cos[token_positions]  # ...,seq_len,half_dk
-        sin = self.sin[token_positions]  # ...,seq_len,half_dk
+        cos = self.cos[token_positions]  # batch, seq_len, half_dk
+        sin = self.sin[token_positions]  # batch, seq_len, half_dk
+        
+        # 如果 x 有 num_heads 维度 (batch, heads, seq, d_k)，需要扩展 cos/sin
+        if x.dim() == 4:
+            cos = cos.unsqueeze(1)  # batch, 1, seq_len, half_dk
+            sin = sin.unsqueeze(1)  # batch, 1, seq_len, half_dk
 
         x_even = x[...,0::2]
         x_odd = x[...,1::2]

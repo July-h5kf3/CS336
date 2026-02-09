@@ -1,0 +1,38 @@
+# ==================== 数据预处理配置 ====================
+preprocess:
+  input: /home/acd66/project/CS336/assignment1-basics/tests/fixtures/tinystories_sample_5M.txt
+  output: /home/acd66/project/CS336/assignment1-basics/tests/fixtures/tinystories_sample_5M.npy
+  vocab: /home/acd66/project/CS336/assignment1-basics/tests/outputs/TinyStoriesV2-GPT4-train_vocab.pkl
+  merges: /home/acd66/project/CS336/assignment1-basics/tests/outputs/TinyStoriesV2-GPT4-train_merges.pkl
+  special_tokens: "<endoftext>"
+
+# ==================== 模型配置 ====================
+model:
+  d_model: 512
+  vocab_size: 10000
+  context_length: 256
+  d_ff: 1344
+  RoPE_theta: 10000
+  num_layers: 4
+  num_heads: 16
+
+# ==================== 训练配置 ====================
+training:
+  device: cpu  # 或 cuda
+  batch_size: 32
+  total_steps: 40000
+  max_lr: 1e-3
+  min_lr: 1e-5
+  warmup_steps: 500
+  max_grad_norm: 1.0
+  weight_decay: 1e-2
+  log_interval: 100
+  save_interval: 1000
+  checkpoint_dir: /home/acd66/project/CS336/assignment1-basics/tests/outputs/checkpoints
+
+# ==================== WandB 配置 ====================
+wandb:
+  enabled: true
+  project: cs336-transformer
+  run_name: tinystories-4layer
+  log_interval: 100  # 多少步记录一次到 wandb

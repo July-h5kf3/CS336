@@ -1,0 +1,14 @@
+{"time":"2026-02-09T21:11:49.952679085+08:00","level":"INFO","msg":"stream: starting","core version":"0.24.2"}
+{"time":"2026-02-09T21:11:54.680651297+08:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": EOF"}
+{"time":"2026-02-09T21:12:04.571585562+08:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": EOF"}
+{"time":"2026-02-09T21:12:10.351048089+08:00","level":"INFO","msg":"stream: created new stream","id":"lk2gptcj"}
+{"time":"2026-02-09T21:12:10.351211821+08:00","level":"INFO","msg":"handler: started","stream_id":"lk2gptcj"}
+{"time":"2026-02-09T21:12:10.351304477+08:00","level":"INFO","msg":"stream: started","id":"lk2gptcj"}
+{"time":"2026-02-09T21:12:10.35134848+08:00","level":"INFO","msg":"writer: started","stream_id":"lk2gptcj"}
+{"time":"2026-02-09T21:12:10.351379281+08:00","level":"INFO","msg":"sender: started","stream_id":"lk2gptcj"}
+{"time":"2026-02-09T21:12:11.954612031+08:00","level":"INFO","msg":"stream: closing","id":"lk2gptcj"}
+{"time":"2026-02-09T21:12:14.015298746+08:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2026-02-09T21:12:15.492564038+08:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/files/acd66-nankai-university/cs336-transformer/lk2gptcj/file_stream\": EOF"}
+{"time":"2026-02-09T21:12:19.058716816+08:00","level":"INFO","msg":"handler: closed","stream_id":"lk2gptcj"}
+{"time":"2026-02-09T21:12:19.058913911+08:00","level":"INFO","msg":"sender: closed","stream_id":"lk2gptcj"}
+{"time":"2026-02-09T21:12:19.05892663+08:00","level":"INFO","msg":"stream: closed","id":"lk2gptcj"}
