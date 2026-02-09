@@ -38,7 +38,10 @@ pytest -q
   - [x] 1.3 The cross-entropy loss function and the AdamW optimizer（完成时间：2.9）
     - ![](fig/nn_utils.png)
     - ![](fig/optimizer.png)
-  - [ ] 1.4 The training loop, with support for serializing and loading model and optimizer state（完成时间：待定）
+  - [x] 1.4 The training loop, with support for serializing and loading model and optimizer state（完成时间：2.10）
+    - ![](fig/all.png)
+  - [ ] 1.5 Inference（完成时间：待定）
+  - [ ] 1.6 Experiments（完成时间：待定）
 - [ ] 2. Systems（完成时间：待定）
 - [ ] 3. Scaling（完成时间：待定）
 - [ ] 4. Data（完成时间：待定）

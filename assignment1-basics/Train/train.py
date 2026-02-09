@@ -1,5 +1,5 @@
 """
-完整的训练循环脚本（支持 WandB 日志记录）
+完整的训练循环脚本（支持 WandB 日志记录和验证集评估）
 """
 import os
 import sys
@@ -35,6 +35,24 @@ def load_config(config_path: str) -> dict:
         return yaml.safe_load(f)
 
 
+@torch.no_grad()
+def evaluate(model, data, batch_size, context_length, device, vocab_size, eval_steps):
+    """在数据上评估模型，返回平均 loss"""
+    model.eval()
+    total_loss = 0.0
+    
+    for _ in range(eval_steps):
+        xb, yb = get_batch(data, batch_size, context_length, device)
+        logits = model.forward(xb)
+        logits_flat = logits.view(-1, vocab_size)
+        yb_flat = yb.view(-1)
+        loss = cross_entropy(logits_flat, yb_flat)
+        total_loss += loss.item()
+    
+    model.train()
+    return total_loss / eval_steps
+
+
 def train(config_path: str, resume_path: str = None):
     """
     主训练函数
@@ -47,7 +65,8 @@ def train(config_path: str, resume_path: str = None):
     config = load_config(config_path)
     model_config = config['model']
     train_config = config['training']
-    preprocess_config = config['preprocess']
+    data_config = config.get('data', {})
+    preprocess_config = config.get('preprocess', {})
     wandb_config = config.get('wandb', {})
     
     # WandB 初始化
@@ -69,11 +88,21 @@ def train(config_path: str, resume_path: str = None):
     device = train_config.get('device', 'cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
-    # 加载数据（memory-mapped）
-    data_path = preprocess_config['output']
-    print(f"Loading data from {data_path}...")
-    train_data = np.load(data_path, mmap_mode='r')
-    print(f"Data shape: {train_data.shape}, dtype: {train_data.dtype}")
+    # 加载训练数据（memory-mapped）
+    train_data_path = data_config.get('train_path') or preprocess_config.get('output')
+    print(f"Loading training data from {train_data_path}...")
+    train_data = np.load(train_data_path, mmap_mode='r')
+    print(f"Training data shape: {train_data.shape}, dtype: {train_data.dtype}")
+    
+    # 加载验证数据（可选）
+    val_data_path = data_config.get('val_path')
+    val_data = None
+    if val_data_path and os.path.exists(val_data_path):
+        print(f"Loading validation data from {val_data_path}...")
+        val_data = np.load(val_data_path, mmap_mode='r')
+        print(f"Validation data shape: {val_data.shape}, dtype: {val_data.dtype}")
+    else:
+        print("No validation data found. Skipping validation.")
     
     # 创建模型
     print("Initializing model...")
@@ -118,13 +147,17 @@ def train(config_path: str, resume_path: str = None):
     max_grad_norm = float(train_config['max_grad_norm'])
     log_interval = int(train_config['log_interval'])
     save_interval = int(train_config['save_interval'])
+    eval_interval = int(train_config.get('eval_interval', 500))
+    eval_steps = int(train_config.get('eval_steps', 10))
     wandb_log_interval = int(wandb_config.get('log_interval', log_interval))
+    vocab_size = int(model_config['vocab_size'])
     
     print(f"\n=== Training Config ===")
     print(f"Batch size: {batch_size}")
     print(f"Context length: {context_length}")
     print(f"Total steps: {total_steps}")
     print(f"LR: {min_lr} -> {max_lr} (warmup: {warmup_steps})")
+    print(f"Eval interval: {eval_interval} steps" if val_data is not None else "No validation")
     print(f"Starting from step: {start_step}")
     print()
     
@@ -141,7 +174,7 @@ def train(config_path: str, resume_path: str = None):
         logits = model.forward(xb)  # (batch, seq_len, vocab_size)
         
         # 3. 计算损失（展平）
-        logits_flat = logits.view(-1, model_config['vocab_size'])
+        logits_flat = logits.view(-1, vocab_size)
         yb_flat = yb.view(-1)
         loss = cross_entropy(logits_flat, yb_flat)
         
@@ -169,7 +202,7 @@ def train(config_path: str, resume_path: str = None):
             pbar.set_postfix({'loss': f'{avg_loss:.4f}', 'lr': f'{lr:.2e}'})
             running_loss = 0.0
         
-        # 9. WandB 日志
+        # 9. WandB 日志（训练 loss）
         if use_wandb and (step + 1) % wandb_log_interval == 0:
             wandb.log({
                 'train/loss': loss.item(),
@@ -177,11 +210,27 @@ def train(config_path: str, resume_path: str = None):
                 'train/step': step + 1,
             }, step=step + 1)
         
-        # 10. 保存 checkpoint
+        # 10. 验证集评估
+        if val_data is not None and (step + 1) % eval_interval == 0:
+            val_loss = evaluate(model, val_data, batch_size, context_length, device, vocab_size, eval_steps)
+            tqdm.write(f"Step {step + 1} | Val Loss: {val_loss:.4f}")
+            
+            if use_wandb:
+                wandb.log({
+                    'val/loss': val_loss,
+                    'train/step': step + 1,
+                }, step=step + 1)
+        
+        # 11. 保存 checkpoint
         if (step + 1) % save_interval == 0:
             ckpt_path = os.path.join(checkpoint_dir, f'ckpt_step_{step + 1}.pt')
             save_checkpoint(model, optimizer, step + 1, ckpt_path)
             tqdm.write(f"Saved checkpoint to {ckpt_path}")
+    
+    # 最终验证
+    if val_data is not None:
+        final_val_loss = evaluate(model, val_data, batch_size, context_length, device, vocab_size, eval_steps)
+        print(f"\nFinal Val Loss: {final_val_loss:.4f}")
     
     # 保存最终模型
     final_path = os.path.join(checkpoint_dir, 'ckpt_final.pt')

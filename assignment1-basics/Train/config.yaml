@@ -28,7 +28,14 @@ training:
   weight_decay: 1e-2
   log_interval: 100
   save_interval: 1000
+  eval_interval: 500  # 多少步评估一次验证集
+  eval_steps: 10      # 验证时采样多少个 batch
   checkpoint_dir: /home/acd66/project/CS336/assignment1-basics/tests/outputs/checkpoints
+
+# ==================== 数据配置 ====================
+data:
+  train_path: /home/acd66/project/CS336/assignment1-basics/tests/fixtures/tinystories_sample_5M.npy
+  val_path: /home/acd66/project/CS336/assignment1-basics/tests/fixtures/tinystories_val.npy  # 验证集路径
 
 # ==================== WandB 配置 ====================
 wandb:
