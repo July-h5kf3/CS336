@@ -4,7 +4,7 @@ preprocess:
   output: /home/acd66/project/CS336/assignment1-basics/tests/fixtures/tinystories_sample_5M.npy
   vocab: /home/acd66/project/CS336/assignment1-basics/tests/outputs/TinyStoriesV2-GPT4-train_vocab.pkl
   merges: /home/acd66/project/CS336/assignment1-basics/tests/outputs/TinyStoriesV2-GPT4-train_merges.pkl
-  special_tokens: "<endoftext>"
+  special_tokens: "<|endoftext|>"
 
 # ==================== 模型配置 ====================
 model:
@@ -50,4 +50,4 @@ inference:
   max_new_tokens: 200       # 最大生成 token 数
   temperature: 0.8          # 采样温度, 0=greedy
   top_p: 0.95               # Top-p (nucleus) 采样, 1.0=禁用
-  eos_token: "<endoftext>"  # EOS token, 遇到则停止生成, null=不停止
+  eos_token: "<|endoftext|>"  # EOS token, 遇到则停止生成, null=不停止
