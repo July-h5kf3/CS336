@@ -29,7 +29,7 @@ pytest -q
 
 ## 进度说明
 
-- [ ] 1. Basics（完成时间：待定）
+- [x] 1. Basics（完成时间：2.10）
   - [x] 1.1 BPE tokenizer（完成时间：1.31）
     - ![](fig/bpe.png)
     - ![](fig/tokenizer.png)
