@@ -40,7 +40,7 @@ pytest -q
     - ![](fig/optimizer.png)
   - [x] 1.4 The training loop, with support for serializing and loading model and optimizer state（完成时间：2.10）
     - ![](fig/all.png)
-  - [ ] 1.5 Inference（完成时间：待定）
+  - [x] 1.5 Inference（完成时间：2.10）
   - [ ] 1.6 Experiments（完成时间：待定）
 - [ ] 2. Systems（完成时间：待定）
 - [ ] 3. Scaling（完成时间：待定）
