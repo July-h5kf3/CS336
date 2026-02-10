@@ -43,3 +43,11 @@ wandb:
   project: cs336-transformer
   run_name: tinystories-4layer
   log_interval: 100  # 多少步记录一次到 wandb
+
+# ==================== 推理配置 ====================
+inference:
+  checkpoint: null          # Checkpoint 路径, null=使用 checkpoint_dir/ckpt_final.pt
+  max_new_tokens: 200       # 最大生成 token 数
+  temperature: 0.8          # 采样温度, 0=greedy
+  top_p: 0.95               # Top-p (nucleus) 采样, 1.0=禁用
+  eos_token: "<endoftext>"  # EOS token, 遇到则停止生成, null=不停止
