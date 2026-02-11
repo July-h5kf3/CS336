@@ -5,6 +5,7 @@ import pickle
 from pathlib import Path
 from collections import Counter, defaultdict
 from cs336_basics.BPE_utils import find_chunk_boundaries, _pretokenize_range
+from tqdm import tqdm
 
 def run_train_bpe(
     input_path: str | os.PathLike,
@@ -67,46 +68,49 @@ def run_train_bpe(
         for a,b in zip(symbols, symbols[1:]):
             pair_counts[(a,b)] += freq
             pair2token[(a,b)].add(token)
-    while len(vocab) < vocab_size:
-        if not pair_counts:
-            break
-        
-        # 合并出现频次最高的pair,如果有多个pair出现频次相同，则选择字典序最大的那个
-        best_pair = max(pair_counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
-        # 更新vocab和word_symbols
-        merges.append(best_pair)
-        merged_token = best_pair[0] + best_pair[1]
-        vocab[len(vocab)] = merged_token
+            
+    with tqdm(total=vocab_size, initial=len(vocab), desc="Training BPE") as pbar:
+        while len(vocab) < vocab_size:
+            if not pair_counts:
+                break
+            
+            # 合并出现频次最高的pair,如果有多个pair出现频次相同，则选择字典序最大的那个
+            best_pair = max(pair_counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
+            # 更新vocab和word_symbols
+            merges.append(best_pair)
+            merged_token = best_pair[0] + best_pair[1]
+            vocab[len(vocab)] = merged_token
+            pbar.update(1)
 
-        tokens_to_update = pair2token[best_pair]
+            tokens_to_update = pair2token[best_pair]
 
-        for token in list(tokens_to_update):
-            freq = word_freqs[token]
-            symbols = word_symbols[token]
-            if len(symbols) < 2:
-                continue
-            new_symbols = []
-            # 这里和原来不同了，我们需要减去旧的pair的计数
-            i = 0
-            while i < len(symbols) - 1:
-                p = (symbols[i], symbols[i+1])
-                pair_counts[p] -= freq
-                pair2token[p].discard(token)
-                i += 1
-            # 然后进行合并
-            i = 0
-            while i < len(symbols):
-                if i < len(symbols) - 1 and (symbols[i], symbols[i+1]) == best_pair:
-                    new_symbols.append(merged_token)
-                    i += 2
-                else:
-                    new_symbols.append(symbols[i])
+            for token in list(tokens_to_update):
+                freq = word_freqs[token]
+                symbols = word_symbols[token]
+                if len(symbols) < 2:
+                    continue
+                new_symbols = []
+                # 这里和原来不同了，我们需要减去旧的pair的计数
+                i = 0
+                while i < len(symbols) - 1:
+                    p = (symbols[i], symbols[i+1])
+                    pair_counts[p] -= freq
+                    pair2token[p].discard(token)
                     i += 1
-            word_symbols[token] = tuple(new_symbols)
-            for i in range(len(new_symbols) - 1):
-                p = (new_symbols[i], new_symbols[i+1])
-                pair_counts[p] += freq
-                pair2token[p].add(token)
+                # 然后进行合并
+                i = 0
+                while i < len(symbols):
+                    if i < len(symbols) - 1 and (symbols[i], symbols[i+1]) == best_pair:
+                        new_symbols.append(merged_token)
+                        i += 2
+                    else:
+                        new_symbols.append(symbols[i])
+                        i += 1
+                word_symbols[token] = tuple(new_symbols)
+                for i in range(len(new_symbols) - 1):
+                    p = (new_symbols[i], new_symbols[i+1])
+                    pair_counts[p] += freq
+                    pair2token[p].add(token)
     return vocab, merges
 
 

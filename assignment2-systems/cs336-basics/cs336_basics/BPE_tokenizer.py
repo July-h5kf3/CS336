@@ -28,7 +28,7 @@ class BPETokenizer:
 
     
     def encode(self,text):
-        from tests.adapters import split_keep_special
+        from cs336_basics.BPE_utils import split_keep_special
         #对单个文本进行BPE编码，返回token id列表
         #首先对文本进行预分词(此时假设text为"Hello <PAD> world!")
         parts = split_keep_special(text, self.special_tokens)
