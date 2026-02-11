@@ -1,60 +1,78 @@
-# CS336 作业仓库
+# 📚 CS336: Large Language Model Systems
 
-这是我的 CS336 课程作业仓库，主要包含 assignment1 的实现与测试。
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-下面是我的飞书云文档链接:
-https://nankai.feishu.cn/wiki/RZOXw0qeCi25PtkNT7RctOCEnJh
+这是我的 Stanford CS336 课程作业仓库，记录了从零开始构建大模型系统的全过程。
 
-## 目录结构
+- **飞书云文档**: [点击查看详细笔记](https://nankai.feishu.cn/wiki/RZOXw0qeCi25PtkNT7RctOCEnJh)
+- **个人博客**: [Lorn3's Blog](https://lorn3.bearblog.dev/)
 
-- `assignment1-basics/`：作业 1 的代码、测试与数据
+---
 
-## 环境与依赖
+## 📂 目录结构
 
-建议使用 Python 3.10+。依赖以作业目录内的 `pyproject.toml` / `uv.lock` 为准。
+- `assignment1-basics/`：Transformer 基础实现
+  - Tokenizer, Model Architecture, Optimizer, Training Loop, Inference
+- `assignment2-systems/`：系统优化与并行训练
+  - Profiling, Triton Kernels, DDP, ZeRO
 
-## 快速开始
+## 🚀 快速开始
 
-进入作业目录：
+建议使用 Python 3.10+ 环境。依赖管理请参考各作业目录内的 `pyproject.toml` 或 `uv.lock`。
 
 ```bash
+# 进入作业目录
 cd assignment1-basics
-```
 
-运行测试（示例）：
-
-```bash
+# 运行测试
 pytest -q
 ```
 
-## 进度说明
+## 📊 进度说明
 
-- [x] 1. Basics（完成时间：2.10）
-  - [x] 1.1 BPE tokenizer（完成时间：1.31）
-    - ![](fig/bpe.png)
-    - ![](fig/tokenizer.png)
-  - [x] 1.2 Transformer language model（完成时间：2.4）
-    - ![](fig/model.png)
-  - [x] 1.3 The cross-entropy loss function and the AdamW optimizer（完成时间：2.9）
-    - ![](fig/nn_utils.png)
-    - ![](fig/optimizer.png)
-  - [x] 1.4 The training loop, with support for serializing and loading model and optimizer state（完成时间：2.10）
-    - ![](fig/all.png)
-  - [x] 1.5 Inference（完成时间：2.10）（出于计算资源的考虑，不进行额外的消融实验，仅在OWT上进行最后的训练与测试）
-    - ![](fig/final.png)
-- [ ] 2. Systems（完成时间：待定）
-- [ ] 3. Scaling（完成时间：待定）
-- [ ] 4. Data（完成时间：待定）
-- [ ] 5. Alignment and Reasoning RL（完成时间：待定）
+### 1. Basics (Assignment 1)
+> ✅ 已完成 (2024.02.10)
 
-## 额外产出
+- [x] **1.1 BPE Tokenizer** (1.31)
+  - ![BPE](fig/bpe.png)
+  - ![Tokenizer](fig/tokenizer.png)
+- [x] **1.2 Transformer Language Model** (2.4)
+  - ![Model](fig/model.png)
+- [x] **1.3 Cross-Entropy Loss & AdamW Optimizer** (2.9)
+  - ![NN Utils](fig/nn_utils.png)
+  - ![Optimizer](fig/optimizer.png)
+- [x] **1.4 Training Loop & Checkpointing** (2.10)
+  - ![Training](fig/all.png)
+- [x] **1.5 Inference** (2.10)
+  - *Note: 仅在 TinyStories 上进行最终训练与测试，未进行额外消融实验。*
+  - ![Inference](fig/final.png)
 
-会在博客中更新一些额外的学习内容。
+### 2. Systems (Assignment 2)
+> 🚧 进行中...
 
-- [x] 关于LLM中位置编码的思考
+- [ ] **Benchmarking and profiling harness**
+- [ ] **Flash Attention 2 Triton Kernel**
+- [ ] **Distributed data parallel training**
+- [ ] **Optimizer state sharding**
 
-博客地址:https://lorn3.bearblog.dev/
+### 3. Scaling
+- [ ] (待定)
 
-## 备注
+### 4. Data
+- [ ] (待定)
 
-如需复现实验结果或提交作业，请以课程要求为准。
+### 5. Alignment and Reasoning RL
+- [ ] (待定)
+
+---
+
+## 📝 额外产出
+
+会在博客中更新一些额外的学习内容与思考。
+
+- [x] [关于 LLM 中位置编码的思考](https://lorn3.bearblog.dev/)
+
+## ⚠️ 备注
+
+如需复现实验结果或提交作业，请以课程官方要求为准。
