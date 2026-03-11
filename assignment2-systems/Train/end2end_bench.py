@@ -3,10 +3,40 @@ import argparse
 import yaml
 import torch
 import pandas as pd
+import math
 
 from cs336_basics.Transformer import Transformer
 from cs336_basics.Cross_entropy import cross_entropy
 from cs336_basics.Adamw import Adamw
+import cs336_basics.CausalMultiHeadSelfAttention as attention_module
+
+"""
+Profile 相关
+"""
+from contextlib import contextmanager
+import torch.cuda.nvtx as nvtx
+
+@contextmanager
+def nvtx_range(name):
+    nvtx.range_push(name)
+    try:
+        yield
+    finally:
+        nvtx.range_pop()
+
+def annotated_scaled_dot_product_attention(Q, K, V, mask=None):
+    d_k = Q.shape[-1]
+    with nvtx_range("ATTN_QK_MATMUL"):
+        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_k)
+    if mask is not None:
+        scores = scores.masked_fill(~mask, float("-inf"))
+    with nvtx_range("ATTN_SOFTMAX"):
+        attn_weights = torch.softmax(scores, dim=-1)
+    with nvtx_range("ATTN_AV_MATMUL"):
+        return torch.matmul(attn_weights, V)
+
+def install_annotated_attention():
+    attention_module.run_scaled_dot_product_attention = annotated_scaled_dot_product_attention
 
 def parse_args():
     parse_args = argparse.ArgumentParser(description="End-to-end Transformer training")
@@ -57,7 +87,8 @@ def benchmark_forward(model, x, warmup_steps, steps):
     start_time = timeit.default_timer()
     for _ in range(steps):
         with torch.no_grad():
-            _ = model(x)
+            with nvtx_range("FWD_STEP"):
+                _ = model(x)
         torch.cuda.synchronize()
     return (timeit.default_timer() - start_time) / steps
 
@@ -76,8 +107,10 @@ def benchmark_train(model, x, y, vocab_size, optimizer, warmup_steps, steps):
         optimizer.zero_grad()
         logits = model(x)
         loss = cross_entropy(logits.view(-1, vocab_size), y.view(-1))
-        loss.backward()
-        optimizer.step()
+        with nvtx_range("BWD_STEP"):
+            loss.backward()
+        with nvtx_range("OPTIM_STEP"):
+            optimizer.step()
         torch.cuda.synchronize()
     return (timeit.default_timer() - start_time) / steps
 
@@ -127,6 +160,7 @@ def measure_peak_memory(model, x, y, vocab_size, optimizer):
 def main():
     args = parse_args()
     config = load_config(args.config)
+    install_annotated_attention()
     model_config = config['model']
     device = config['training']['device']
     assert device == "cuda","Please run bench in cuda!"
