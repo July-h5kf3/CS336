@@ -7,8 +7,8 @@ class SwiGLU(nn.Module):
     def __init__(self,d_model,device = None,dtype = None):
         super().__init__()
         self.d_model = d_model
-        #根据指导手册要求，但是需要保证是64的整数倍
-        d_ff = int(math.ceil((8/3) * d_model / 64) * 64)
+        # Use the standard 4x expansion while keeping the hidden size 64-aligned.
+        d_ff = int(math.ceil((4 * d_model) / 64) * 64)
         
         self.W1 = torch.nn.Parameter(torch.empty((d_ff,d_model),device=device,dtype=dtype))
         self.W2 = torch.nn.Parameter(torch.empty((d_model,d_ff),device=device,dtype=dtype))

@@ -18,8 +18,8 @@ model:
 
 # ==================== 训练配置 ====================
 training:
-  device: cpu  # 或 cuda
-  batch_size: 32
+  device: cuda # 或 cuda
+  batch_size: 4
   total_steps: 40000
   max_lr: 1e-3
   min_lr: 1e-5

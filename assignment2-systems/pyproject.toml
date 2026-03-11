@@ -17,6 +17,7 @@ dependencies = [
     "wandb>=0.19.7",
     "pandas>=2",
     "ty>=0.0.1a16",
+    "tabulate>=0.10.0",
 ]
 
 [build-system]
@@ -27,9 +28,12 @@ build-backend = "uv_build"
 module-name = "cs336_systems"
 module-root = ""
 
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
+
 [tool.uv]
 package = true
-python-preference = "managed"
 
 [tool.uv.sources]
 cs336-basics = { path = "./cs336-basics", editable = true }  # Change this path to your assignment1-basics repo you want to use your own implementation!

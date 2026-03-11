@@ -1,0 +1,6 @@
+cache-dir = ".uv-cache"
+link-mode = "copy"
+python-preference = "system"
+python-downloads = "never"
+index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+concurrent-downloads = 2
