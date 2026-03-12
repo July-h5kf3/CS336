@@ -43,6 +43,7 @@ def parse_args():
     parse_args.add_argument("--config", type=str, default="config.yaml", help="Path to config file")
     parse_args.add_argument("--warmup_steps",type=int,default=10)
     parse_args.add_argument("--steps",type=int,default=100)
+    parse_args.add_argument("--mix_precision",action="store_true",help="Whether to use mixed precision for training benchmark")
     return parse_args.parse_args()
 def load_config(config_path):
     with open(config_path,"r") as f:
@@ -63,9 +64,6 @@ def format_params(num_params):
         return f"{num_params / 1_000_000:.3f}M"
     return str(num_params)
 
-def format_memory_mib(num_bytes):
-    return f"{num_bytes / (1024 ** 2):.2f}"
-
 def build_model(model_config, device):
     model = Transformer(
         vocab_size=model_config['vocab_size'],
@@ -77,7 +75,7 @@ def build_model(model_config, device):
     )
     return model.to(device)
 
-def benchmark_forward(model, x, warmup_steps, steps):
+def benchmark_forward(model, x, warmup_steps, steps,mix_precision=False):
     model.eval()
     for _ in range(warmup_steps):
         with torch.no_grad():
@@ -85,14 +83,28 @@ def benchmark_forward(model, x, warmup_steps, steps):
         torch.cuda.synchronize()
 
     start_time = timeit.default_timer()
-    for _ in range(steps):
-        with torch.no_grad():
-            with nvtx_range("FWD_STEP"):
-                _ = model(x)
-        torch.cuda.synchronize()
+    if mix_precision:
+        with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
+            torch.cuda.memory._record_memory_history(max_entries=1000000)
+            for _ in range(steps):
+                with torch.no_grad():
+                    with nvtx_range("FWD_STEP"):
+                        _ = model(x)
+                torch.cuda.synchronize()
+            torch.cuda.memory._dump_snapshot("memory_FWD_STEP_MIX.pickle")
+            torch.cuda.memory._record_memory_history(enabled=None)
+    else:
+        torch.cuda.memory._record_memory_history(max_entries=1000000)
+        for _ in range(steps):
+            with torch.no_grad():
+                with nvtx_range("FWD_STEP"):
+                    _ = model(x)
+            torch.cuda.synchronize()
+        torch.cuda.memory._dump_snapshot("memory_FWD_STEP.pickle")
+        torch.cuda.memory._record_memory_history(enabled=None)
     return (timeit.default_timer() - start_time) / steps
 
-def benchmark_train(model, x, y, vocab_size, optimizer, warmup_steps, steps):
+def benchmark_train(model, x, y, vocab_size, optimizer, warmup_steps, steps,mix_precision=False):
     model.train()
     for _ in range(warmup_steps):
         optimizer.zero_grad()
@@ -103,15 +115,34 @@ def benchmark_train(model, x, y, vocab_size, optimizer, warmup_steps, steps):
         torch.cuda.synchronize()
 
     start_time = timeit.default_timer()
-    for _ in range(steps):
-        optimizer.zero_grad()
-        logits = model(x)
-        loss = cross_entropy(logits.view(-1, vocab_size), y.view(-1))
-        with nvtx_range("BWD_STEP"):
-            loss.backward()
-        with nvtx_range("OPTIM_STEP"):
-            optimizer.step()
-        torch.cuda.synchronize()
+    if mix_precision:
+        with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
+            torch.cuda.memory._record_memory_history(max_entries=1000000)
+            for _ in range(steps):
+                optimizer.zero_grad()
+                with nvtx_range("FWD_STEP"):
+                    logits = model(x)
+                loss = cross_entropy(logits.view(-1, vocab_size), y.view(-1))
+                with nvtx_range("BWD_STEP"):
+                    loss.backward()
+                with nvtx_range("OPTIM_STEP"):
+                    optimizer.step()
+                torch.cuda.synchronize()
+            torch.cuda.memory._dump_snapshot("memory_TRAIN_STEP_MIX.pickle")
+            torch.cuda.memory._record_memory_history(enabled=None)
+    else:
+        torch.cuda.memory._record_memory_history(max_entries=1000000)
+        for _ in range(steps):
+            optimizer.zero_grad()
+            logits = model(x)
+            loss = cross_entropy(logits.view(-1, vocab_size), y.view(-1))
+            with nvtx_range("BWD_STEP"):
+                loss.backward()
+            with nvtx_range("OPTIM_STEP"):
+                optimizer.step()
+            torch.cuda.synchronize()
+        torch.cuda.memory._dump_snapshot("memory_TRAIN_STEP.pickle")
+        torch.cuda.memory._record_memory_history(enabled=None)
     return (timeit.default_timer() - start_time) / steps
 
 def empty_result_row(size_name, params):
@@ -124,38 +155,12 @@ def empty_result_row(size_name, params):
         "Parameters": "",
         "Forward (s)": "",
         "Forward+Backward (s)": "",
-        "Peak Forward Mem (MiB)": "",
-        "Peak Train Mem (MiB)": "",
     }
 
 def is_oom_error(exc):
     return isinstance(exc, torch.cuda.OutOfMemoryError) or (
         isinstance(exc, RuntimeError) and "out of memory" in str(exc).lower()
     )
-
-def measure_peak_memory(model, x, y, vocab_size, optimizer):
-    metrics = {}
-
-    model.eval()
-    optimizer.zero_grad(set_to_none=True)
-    torch.cuda.reset_peak_memory_stats()
-    with torch.no_grad():
-        _ = model(x)
-    torch.cuda.synchronize()
-    metrics["peak_memory_forward_bytes"] = torch.cuda.max_memory_allocated()
-
-    model.train()
-    optimizer.zero_grad(set_to_none=True)
-    torch.cuda.reset_peak_memory_stats()
-    logits = model(x)
-    loss = cross_entropy(logits.view(-1, vocab_size), y.view(-1))
-    loss.backward()
-    optimizer.step()
-    torch.cuda.synchronize()
-    metrics["peak_memory_train_bytes"] = torch.cuda.max_memory_allocated()
-    optimizer.zero_grad(set_to_none=True)
-
-    return metrics
 
 def main():
     args = parse_args()
@@ -168,9 +173,9 @@ def main():
     steps = args.steps
 
     model_configs = {
-        "small": {"d_model": 768, "d_ff": 3072, "num_layers": 12, "num_heads": 12},
+        # "small": {"d_model": 768, "d_ff": 3072, "num_layers": 12, "num_heads": 12},
         # "medium": {"d_model": 1024, "d_ff": 4096, "num_layers": 24, "num_heads": 16},
-        # "large": {"d_model": 1280, "d_ff": 5120, "num_layers": 36, "num_heads": 20},
+        "large": {"d_model": 1280, "d_ff": 5120, "num_layers": 36, "num_heads": 20},
         # "xl": {"d_model": 1600, "d_ff": 6400, "num_layers": 48, "num_heads": 25},
         # "7B": {"d_model": 2560, "d_ff": 10240, "num_layers": 32, "num_heads": 32},
     }
@@ -203,7 +208,7 @@ def main():
             )
             model = build_model(current_model_config, device)
             row["Parameters"] = format_params(count_parameters(model))
-            fwd_time = benchmark_forward(model, x, warmup_steps, steps)
+            fwd_time = benchmark_forward(model, x, warmup_steps, steps,args.mix_precision)
             row["Forward (s)"] = f"{fwd_time:.6f}"
         except Exception as exc:
             if is_oom_error(exc):
@@ -236,18 +241,10 @@ def main():
                 current_model_config['vocab_size'],
                 optimizer,
                 warmup_steps,
-                steps
+                steps,
+                args.mix_precision
             )
             row["Forward+Backward (s)"] = f"{fwd_bwd_time:.6f}"
-            memory_metrics = measure_peak_memory(
-                model,
-                x,
-                y,
-                current_model_config['vocab_size'],
-                optimizer
-            )
-            row["Peak Forward Mem (MiB)"] = format_memory_mib(memory_metrics["peak_memory_forward_bytes"])
-            row["Peak Train Mem (MiB)"] = format_memory_mib(memory_metrics["peak_memory_train_bytes"])
         except Exception as exc:
             if is_oom_error(exc):
                 print(
