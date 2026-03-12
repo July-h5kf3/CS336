@@ -51,7 +51,7 @@ pytest -q
 ### 2. Systems (Assignment 2)
 > 🚧 进行中...
 
-- [ ] **Benchmarking and profiling harness**
+- [x] **Benchmarking and profiling harness**(3.12)
 - [ ] **Flash Attention 2 Triton Kernel**
 - [ ] **Distributed data parallel training**
 - [ ] **Optimizer state sharding**
