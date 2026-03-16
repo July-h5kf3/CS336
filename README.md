@@ -71,7 +71,9 @@ pytest -q
 
 会在博客中更新一些额外的学习内容与思考。
 
-- [x] [关于 LLM 中位置编码的思考](https://lorn3.bearblog.dev/)
+- [x] [关于 LLM 中位置编码的思考](https://lorn3.bearblog.dev/transformer/)
+
+- [x] Triton Puzzles Lite Via Block Pointer [题库](https://github.com/SiriusNEO/Triton-Puzzles-Lite)  [解答Blog](https://lorn3.bearblog.dev/triton/)
 
 ## ⚠️ 备注
 
