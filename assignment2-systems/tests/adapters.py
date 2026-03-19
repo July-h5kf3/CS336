@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Type
 
 import torch
-from cs336_systems.Triton.FlashAttention_pytorch import FlashAttention_pytorch
+from cs336_systems.FlashAttention_pytorch import FlashAttention_pytorch
 
 
 
