@@ -139,8 +139,10 @@ def benchmark_attention(seq_len,d_model,warm_up_step,pass_step,batch_size=8,jit=
 
 def main():
     args = parse_args()
-    d_models = [16,32,64,128]
-    seq_lens = [256,1024,4096,8192,16384]
+    d_models = [16,32]
+    seq_lens = [256,1024]
+    # d_models = [16,32,64,128]
+    # seq_lens = [256,1024,4096,8192,16384]
     results = []
     for d_model in d_models:
         for seq_len in seq_lens:
