@@ -13,9 +13,15 @@ We manage our environments with `uv` to ensure reproducibility, portability, and
 Install `uv` [here](https://github.com/astral-sh/uv) (recommended), or run `pip install uv`/`brew install uv`.
 We recommend reading a bit about managing projects in `uv` [here](https://docs.astral.sh/uv/guides/projects/#managing-dependencies) (you will not regret it!).
 
-You can now run any code in the repo using
+We recommend using the shared environment at the repo root to avoid duplicate `a1`/`a2` envs.
+From this directory, run:
 ```sh
-uv run <python_file_path>
+uv run --project .. <python_file_path>
+```
+
+You can also run any code in this repo using
+```sh
+uv run --project .. <python_file_path>
 ```
 and the environment will be automatically solved and activated when necessary.
 
@@ -23,7 +29,7 @@ and the environment will be automatically solved and activated when necessary.
 
 
 ```sh
-uv run pytest
+uv run --project .. pytest
 ```
 
 Initially, all tests should fail with `NotImplementedError`s.
@@ -47,4 +53,3 @@ gunzip owt_valid.txt.gz
 
 cd ..
 ```
-

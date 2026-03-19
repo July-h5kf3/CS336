@@ -19,14 +19,12 @@
 
 ## 🚀 快速开始
 
-建议使用 Python 3.10+ 环境。依赖管理请参考各作业目录内的 `pyproject.toml` 或 `uv.lock`。
+建议使用 Python 3.11+ 环境。仓库使用 **单一共享环境**（在仓库根目录），避免 `a1`/`a2` 分别创建环境。
 
 ```bash
-# 进入作业目录
-cd assignment1-basics
-
-# 运行测试
-pytest -q
+  curl -LsSf https://astral.sh/uv/install.sh | sh 
+  source $HOME/.local/bin/env
+  uv sync
 ```
 
 ## 📊 进度说明

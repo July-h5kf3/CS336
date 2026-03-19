@@ -1,0 +1,16 @@
+[project]
+name = "cs336-workspace"
+version = "0.1.0"
+description = "Shared environment for CS336 assignments"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "cs336-basics",
+    "cs336-systems",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+cs336-basics = { path = "assignment1-basics", editable = true }
+cs336-systems = { path = "assignment2-systems", editable = true }

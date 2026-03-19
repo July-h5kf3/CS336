@@ -39,11 +39,13 @@ If you would like to use your own implementation of assignment 1, replace the `c
 directory with your own implementation, or edit the outer `pyproject.toml` file to point to your
 own implementation.
 
-0. We use `uv` to manage dependencies. You can verify that the code from the `cs336-basics`
+0. We use `uv` to manage dependencies. We recommend using the shared environment at the repo root
+to avoid duplicate `a1`/`a2` envs. From this directory, prefix commands with `--project ..`.
+You can verify that the code from the `cs336-basics`
 package is accessible by running:
 
 ```sh
-$ uv run python
+$ uv run --project .. python
 Using CPython 3.12.10
 Creating virtual environment at: /path/to/uv/env/dir
       Built cs336-systems @ file:///path/to/systems/dir
@@ -55,7 +57,7 @@ Python 3.12.10 (main, Apr  9 2025, 04:03:51) [Clang 20.1.0 ] on linux
 >>> 
 ```
 
-`uv run` installs dependencies automatically as dictated in the `pyproject.toml` file.
+`uv run --project ..` installs dependencies automatically as dictated in the repo-root `pyproject.toml` file.
 
 ## Submitting
 
