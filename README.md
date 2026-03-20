@@ -50,7 +50,7 @@
 > 🚧 进行中...
 
 - [x] **Benchmarking and profiling harness**(3.12)
-- [ ] **Flash Attention 2 Triton Kernel**
+- [x] **Flash Attention 2 Triton Kernel**(3.20)
 - [ ] **Distributed data parallel training**
 - [ ] **Optimizer state sharding**
 
