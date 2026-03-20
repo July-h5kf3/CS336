@@ -1,6 +1,7 @@
 from einops import rearrange, einsum
 from cs336_basics.Linear import Linear
 from cs336_basics.RotaryPositionalEmbedding import RotaryPositionalEmbedding
+from cs336_systems.Triton.FlashAttention import FlashAttention
 
 import torch
 import torch.nn as nn
@@ -52,7 +53,7 @@ def run_scaled_dot_product_attention(
     return einsum(attn_weights,V,"... q k,... k d_v -> ... q d_v")
 
 class CausalMultiHeadSelfAttention(nn.Module):
-    def __init__(self,d_model,num_heads,seq_len,device,use_rope=True):
+    def __init__(self,d_model,num_heads,seq_len,device,use_rope=True,use_flash = True):
         """
         d_model: int,模型维度
         num_heads: int,注意力头数
@@ -66,6 +67,7 @@ class CausalMultiHeadSelfAttention(nn.Module):
         self.d_k = d_model // num_heads
         self.device = device
         self.theta = 10000.0
+        self.use_flash = use_flash
 
         self.W_q = Linear(self.d_model, self.d_model, self.device)
         self.W_k = Linear(self.d_model, self.d_model, self.device)
@@ -97,9 +99,15 @@ class CausalMultiHeadSelfAttention(nn.Module):
         if self.use_rope:
             Q = self.RoPE(Q,token_positions)
             K = self.RoPE(K,token_positions)
-        
-        mask = torch.tril(torch.ones((seq_len,seq_len),device=self.device)).bool()
-        attn_output = run_scaled_dot_product_attention(Q,K,V,mask=mask)
+        if self.use_flash:
+            Q = rearrange(Q, "b h s d_k -> (b h) s d_k").contiguous()
+            K = rearrange(K, "b h s d_k -> (b h) s d_k").contiguous()
+            V = rearrange(V, "b h s d_k -> (b h) s d_k").contiguous()
+            attn_output = FlashAttention.apply(Q,K,V,True)
+            attn_output = rearrange(attn_output,"(b h) s d_k -> b h s d_k",b=batch_size,h=self.num_heads,)
+        else:
+            mask = torch.tril(torch.ones((seq_len,seq_len),device=self.device)).bool()
+            attn_output = run_scaled_dot_product_attention(Q,K,V,mask=mask)
         attn_output = rearrange(attn_output,"b h s d_k -> b s (h d_k)")
         out = self.W_o(attn_output)
         return out  
