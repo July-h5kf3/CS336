@@ -15,7 +15,7 @@ class FlashAttention_pytorch(torch.autograd.Function):
         O = torch.zeros(batch_size,seq_len,d_model,dtype=dtype,device=device)
         L = torch.zeros(batch_size,seq_len,dtype=dtype,device=device)
         for i in range(0,seq_len // TILE_SIZE):
-            m = torch.full((batch_size,TILE_SIZE),float("-inf"),device=device)
+            m = torch.full((batch_size,TILE_SIZE),float("-inf"),dtype=dtype,device=device)
             l = torch.zeros(batch_size,TILE_SIZE,dtype=dtype,device=device)
             B_q = Q[:,i*TILE_SIZE:(i + 1) * TILE_SIZE,:]
             for j in range(0,seq_len // TILE_SIZE):
@@ -55,7 +55,6 @@ class FlashAttention_pytorch(torch.autograd.Function):
                 dK[:,j*TILE_SIZE:(j+1)*TILE_SIZE,:] += torch.matmul(dS_ij.transpose(-1,-2),Q_b) * scale
         return dQ,dK,dV,None
                 
-
 
 
 

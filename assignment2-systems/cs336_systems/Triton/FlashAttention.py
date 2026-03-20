@@ -23,6 +23,8 @@ def flash_fwd_kernel(
 ):
     query_tile_index = tl.program_id(0)
     batch_index = tl.program_id(1)
+    query_tile_start = query_tile_index * Q_TILE_SIZE
+    query_tile_end = query_tile_start + Q_TILE_SIZE - 1
     Q_block_ptr = tl.make_block_ptr(
         base = Q_ptr + batch_index * stride_qb,
         shape = (N_QUERIES,D),
@@ -68,26 +70,38 @@ def flash_fwd_kernel(
     l = tl.zeros((Q_TILE_SIZE,),dtype = tl.float32)
     O = tl.zeros((Q_TILE_SIZE,D),dtype=tl.float32)
     B_q = tl.load(Q_block_ptr,boundary_check=(0,1),padding_option="zero")
-    for j in range(tl.cdiv(N_KEYS,K_TILE_SIZE)):
-        B_k = tl.load(K_block_ptr,boundary_check=(0,1),padding_option="zero")
-        B_v = tl.load(V_block_ptr,boundary_check=(0,1),padding_option="zero")
-        S = tl.dot(B_q,tl.trans(B_k)) * scale
-        if is_causal:
-            q_idx = query_tile_index * Q_TILE_SIZE + tl.arange(0,Q_TILE_SIZE)
+    if is_causal:
+        for j in range(tl.cdiv(query_tile_start + Q_TILE_SIZE, K_TILE_SIZE)):
+            B_k = tl.load(K_block_ptr,boundary_check=(0,1),padding_option="zero")
+            B_v = tl.load(V_block_ptr,boundary_check=(0,1),padding_option="zero")
+            S = tl.dot(B_q,tl.trans(B_k)) * scale
+            q_idx = query_tile_start + tl.arange(0,Q_TILE_SIZE)
             k_idx = j * K_TILE_SIZE + tl.arange(0,K_TILE_SIZE)
             causal_mask = q_idx[:,None] < k_idx[None,:]
             S = tl.where(causal_mask,float("-inf"),S)
-        last_m,last_l = m,l
-        m = tl.maximum(last_m,tl.max(S,axis=1))
-        S_ = tl.exp(S - m[:,None])
-        l = last_l * tl.exp(last_m - m) + tl.sum(S_,axis=1)
-        O = tl.dot(S_.to(B_v.dtype),B_v,acc=O * tl.exp(last_m - m)[:,None])
-        K_block_ptr = tl.advance(K_block_ptr,(K_TILE_SIZE,0))
-        V_block_ptr = tl.advance(V_block_ptr,(K_TILE_SIZE,0))
+            last_m,last_l = m,l
+            m = tl.maximum(last_m,tl.max(S,axis=1))
+            S_ = tl.exp(S - m[:,None])
+            l = last_l * tl.exp(last_m - m) + tl.sum(S_,axis=1)
+            O = tl.dot(S_.to(B_v.dtype),B_v,acc=O * tl.exp(last_m - m)[:,None])
+            K_block_ptr = tl.advance(K_block_ptr,(K_TILE_SIZE,0))
+            V_block_ptr = tl.advance(V_block_ptr,(K_TILE_SIZE,0))
+    else:
+        for _ in range(tl.cdiv(N_KEYS,K_TILE_SIZE)):
+            B_k = tl.load(K_block_ptr,boundary_check=(0,1),padding_option="zero")
+            B_v = tl.load(V_block_ptr,boundary_check=(0,1),padding_option="zero")
+            S = tl.dot(B_q,tl.trans(B_k)) * scale
+            last_m,last_l = m,l
+            m = tl.maximum(last_m,tl.max(S,axis=1))
+            S_ = tl.exp(S - m[:,None])
+            l = last_l * tl.exp(last_m - m) + tl.sum(S_,axis=1)
+            O = tl.dot(S_.to(B_v.dtype),B_v,acc=O * tl.exp(last_m - m)[:,None])
+            K_block_ptr = tl.advance(K_block_ptr,(K_TILE_SIZE,0))
+            V_block_ptr = tl.advance(V_block_ptr,(K_TILE_SIZE,0))
     O = O / l[:,None]
     L = tl.log(l) + m
     tl.store(O_block_ptr, O.to(O_block_ptr.type.element_ty), boundary_check=(0, 1))
-    tl.store(L_block_ptr,L,boundary_check=(0,))
+    tl.store(L_block_ptr,L.to(L_block_ptr.type.element_ty),boundary_check=(0,))
 
 @triton.jit
 def flash_bwd_kernel_phase1(
@@ -108,6 +122,8 @@ def flash_bwd_kernel_phase1(
 ):
     query_tile_index = tl.program_id(0)
     batch_index = tl.program_id(1)
+    query_tile_start = query_tile_index * Q_TILE_SIZE
+    query_tile_end = query_tile_start + Q_TILE_SIZE - 1
     Q_block_ptr = tl.make_block_ptr(
         base = Q_ptr + batch_index * stride_qb,
         shape = (N_QUERIES,D),
@@ -170,21 +186,32 @@ def flash_bwd_kernel_phase1(
     B_q = tl.load(Q_block_ptr,boundary_check=(0,1),padding_option="zero")
     B_l = tl.load(L_block_ptr,boundary_check=(0,),padding_option="zero")
     dQ = tl.zeros((Q_TILE_SIZE,D),dtype=tl.float32)
-    for j in range(tl.cdiv(N_KEYS,K_TILE_SIZE)):
-        B_k = tl.load(K_block_ptr,boundary_check=(0,1),padding_option="zero")
-        B_v = tl.load(V_block_ptr,boundary_check=(0,1),padding_option="zero")
-        S_ij = tl.dot(B_q,B_k.T) * scale
-        if is_causal:
-            q_idx = query_tile_index * Q_TILE_SIZE + tl.arange(0,Q_TILE_SIZE)
+    if is_causal:
+        for j in range(tl.cdiv(query_tile_start + Q_TILE_SIZE, K_TILE_SIZE)):
+            B_k = tl.load(K_block_ptr,boundary_check=(0,1),padding_option="zero")
+            B_v = tl.load(V_block_ptr,boundary_check=(0,1),padding_option="zero")
+            S_ij = tl.dot(B_q,tl.trans(B_k)) * scale
+            q_idx = query_tile_start + tl.arange(0,Q_TILE_SIZE)
             k_idx = j * K_TILE_SIZE + tl.arange(0,K_TILE_SIZE)
             causal_mask = q_idx[:,None] < k_idx[None,:]
             S_ij = tl.where(causal_mask,float("-inf"),S_ij)
-        P_ij = tl.exp(S_ij - B_l[:,None])
-        dP_ij = tl.dot(B_dO,B_v.T)
-        dS_ij = P_ij * (dP_ij - D0[:,None])
-        dQ += tl.dot(dS_ij,B_k) * scale
-        K_block_ptr = tl.advance(K_block_ptr,(K_TILE_SIZE,0))
-        V_block_ptr = tl.advance(V_block_ptr,(K_TILE_SIZE,0))
+            P_ij = tl.exp(S_ij - B_l[:,None])
+            dP_ij = tl.dot(B_dO,tl.trans(B_v))
+            dS_ij = P_ij * (dP_ij - D0[:,None])
+            dQ += tl.dot(dS_ij.to(B_k.dtype),B_k) * scale
+            K_block_ptr = tl.advance(K_block_ptr,(K_TILE_SIZE,0))
+            V_block_ptr = tl.advance(V_block_ptr,(K_TILE_SIZE,0))
+    else:
+        for _ in range(tl.cdiv(N_KEYS,K_TILE_SIZE)):
+            B_k = tl.load(K_block_ptr,boundary_check=(0,1),padding_option="zero")
+            B_v = tl.load(V_block_ptr,boundary_check=(0,1),padding_option="zero")
+            S_ij = tl.dot(B_q,tl.trans(B_k)) * scale
+            P_ij = tl.exp(S_ij - B_l[:,None])
+            dP_ij = tl.dot(B_dO,tl.trans(B_v))
+            dS_ij = P_ij * (dP_ij - D0[:,None])
+            dQ += tl.dot(dS_ij.to(B_k.dtype),B_k) * scale
+            K_block_ptr = tl.advance(K_block_ptr,(K_TILE_SIZE,0))
+            V_block_ptr = tl.advance(V_block_ptr,(K_TILE_SIZE,0))
     tl.store(dQ_block_ptr,dQ.to(dQ_block_ptr.type.element_ty),boundary_check=(0,1))
 
 @triton.jit
@@ -206,6 +233,7 @@ def flash_bwd_kernel_phase2(
 ):
     key_tile_index = tl.program_id(0)
     batch_index = tl.program_id(1)
+    key_tile_start = key_tile_index * K_TILE_SIZE
     Q_block_ptr = tl.make_block_ptr(
         base = Q_ptr + batch_index * stride_qb,
         shape = (N_QUERIES,D),
@@ -274,27 +302,49 @@ def flash_bwd_kernel_phase2(
     B_v = tl.load(V_block_ptr,boundary_check=(0,1),padding_option="zero")
     dK = tl.zeros((K_TILE_SIZE,D),dtype=tl.float32)
     dV = tl.zeros((K_TILE_SIZE,D),dtype=tl.float32)
-    for i in range(tl.cdiv(N_QUERIES,Q_TILE_SIZE)):
-        B_dO = tl.load(dO_block_ptr,boundary_check=(0,1),padding_option="zero")
-        B_O = tl.load(O_block_ptr,boundary_check=(0,1),padding_option="zero")
-        B_q = tl.load(Q_block_ptr,boundary_check=(0,1),padding_option="zero")
-        B_l = tl.load(L_block_ptr,boundary_check=(0,),padding_option="zero")
-        D0 = tl.sum(B_dO * B_O,axis=1)
-        S_ij = tl.dot(B_q,B_k.T) * scale
-        if is_causal:
+    if is_causal:
+        first_query_tile = key_tile_start // Q_TILE_SIZE
+        dO_block_ptr = tl.advance(dO_block_ptr,(first_query_tile * Q_TILE_SIZE,0))
+        O_block_ptr = tl.advance(O_block_ptr,(first_query_tile * Q_TILE_SIZE,0))
+        Q_block_ptr = tl.advance(Q_block_ptr,(first_query_tile * Q_TILE_SIZE,0))
+        L_block_ptr = tl.advance(L_block_ptr,(first_query_tile * Q_TILE_SIZE,))
+        for i in range(first_query_tile, tl.cdiv(N_QUERIES,Q_TILE_SIZE)):
+            B_dO = tl.load(dO_block_ptr,boundary_check=(0,1),padding_option="zero")
+            B_O = tl.load(O_block_ptr,boundary_check=(0,1),padding_option="zero")
+            B_q = tl.load(Q_block_ptr,boundary_check=(0,1),padding_option="zero")
+            B_l = tl.load(L_block_ptr,boundary_check=(0,),padding_option="zero")
+            D0 = tl.sum(B_dO * B_O,axis=1)
+            S_ij = tl.dot(B_q,tl.trans(B_k)) * scale
             q_idx = i * Q_TILE_SIZE + tl.arange(0,Q_TILE_SIZE)
             k_idx = key_tile_index * K_TILE_SIZE + tl.arange(0,K_TILE_SIZE)
             causal_mask = q_idx[:,None] < k_idx[None,:]
             S_ij = tl.where(causal_mask,float("-inf"),S_ij)
-        P_ij = tl.exp(S_ij - B_l[:,None])
-        dV += tl.dot(P_ij.T,B_dO)
-        dP_ij = tl.dot(B_dO,B_v.T)
-        dS_ij = P_ij * (dP_ij - D0[:,None])
-        dK += tl.dot(dS_ij.T,B_q) * scale
-        dO_block_ptr = tl.advance(dO_block_ptr,(Q_TILE_SIZE,0))
-        O_block_ptr = tl.advance(O_block_ptr,(Q_TILE_SIZE,0))
-        Q_block_ptr = tl.advance(Q_block_ptr,(Q_TILE_SIZE,0))
-        L_block_ptr = tl.advance(L_block_ptr,(Q_TILE_SIZE,))
+            P_ij = tl.exp(S_ij - B_l[:,None])
+            dV += tl.dot(tl.trans(P_ij).to(B_dO.dtype),B_dO)
+            dP_ij = tl.dot(B_dO,tl.trans(B_v))
+            dS_ij = P_ij * (dP_ij - D0[:,None])
+            dK += tl.dot(tl.trans(dS_ij).to(B_q.dtype),B_q) * scale
+            dO_block_ptr = tl.advance(dO_block_ptr,(Q_TILE_SIZE,0))
+            O_block_ptr = tl.advance(O_block_ptr,(Q_TILE_SIZE,0))
+            Q_block_ptr = tl.advance(Q_block_ptr,(Q_TILE_SIZE,0))
+            L_block_ptr = tl.advance(L_block_ptr,(Q_TILE_SIZE,))
+    else:
+        for _ in range(tl.cdiv(N_QUERIES,Q_TILE_SIZE)):
+            B_dO = tl.load(dO_block_ptr,boundary_check=(0,1),padding_option="zero")
+            B_O = tl.load(O_block_ptr,boundary_check=(0,1),padding_option="zero")
+            B_q = tl.load(Q_block_ptr,boundary_check=(0,1),padding_option="zero")
+            B_l = tl.load(L_block_ptr,boundary_check=(0,),padding_option="zero")
+            D0 = tl.sum(B_dO * B_O,axis=1)
+            S_ij = tl.dot(B_q,tl.trans(B_k)) * scale
+            P_ij = tl.exp(S_ij - B_l[:,None])
+            dV += tl.dot(tl.trans(P_ij).to(B_dO.dtype),B_dO)
+            dP_ij = tl.dot(B_dO,tl.trans(B_v))
+            dS_ij = P_ij * (dP_ij - D0[:,None])
+            dK += tl.dot(tl.trans(dS_ij).to(B_q.dtype),B_q) * scale
+            dO_block_ptr = tl.advance(dO_block_ptr,(Q_TILE_SIZE,0))
+            O_block_ptr = tl.advance(O_block_ptr,(Q_TILE_SIZE,0))
+            Q_block_ptr = tl.advance(Q_block_ptr,(Q_TILE_SIZE,0))
+            L_block_ptr = tl.advance(L_block_ptr,(Q_TILE_SIZE,))
     tl.store(dK_block_ptr,dK.to(dK_block_ptr.type.element_ty),boundary_check = (0,1))
     tl.store(dV_block_ptr,dV.to(dV_block_ptr.type.element_ty),boundary_check = (0,1))
 
@@ -327,10 +377,10 @@ class FlashAttention(torch.autograd.Function):
             Q_TILE_SIZE,K_TILE_SIZE,
             is_causal,
         )
-        ctx.save_for_backward(L,K,Q,V,O)
+        ctx.save_for_backward(L,Q,K,V,O)
         return O
     def backward(ctx,grad_output):
-        L,K,Q,V,O = ctx.saved_tensors
+        L,Q,K,V,O = ctx.saved_tensors
         is_causal = ctx.is_causal
         Q_TILE_SIZE = ctx.Q_TILE_SIZE
         K_TILE_SIZE = ctx.K_TILE_SIZE
@@ -374,5 +424,3 @@ class FlashAttention(torch.autograd.Function):
             is_causal
         )    
         return dQ,dK,dV,None
-
-
