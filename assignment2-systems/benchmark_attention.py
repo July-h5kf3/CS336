@@ -1,6 +1,8 @@
 import argparse
 from contextlib import contextmanager
+from pathlib import Path
 
+import matplotlib.pyplot as plt
 import torch
 import triton
 from einops import einsum
@@ -11,8 +13,8 @@ from cs336_systems.Triton import FlashAttention as flash_triton_module
 from cs336_systems.Triton.FlashAttention import FlashAttention
 
 
-LOCAL_SEQ_LENS = [256, 1024,2048,4096]
-LOCAL_D_MODELS = [16, 32,64,128]
+LOCAL_SEQ_LENS = [2048,4096]
+LOCAL_D_MODELS = [64,128]
 FULL_SEQ_LENS = [2 ** exp for exp in range(7, 17)]
 FULL_D_MODELS = [2 ** exp for exp in range(4, 8)]
 DTYPE_CHOICES = {
@@ -40,8 +42,8 @@ def to_markdown_table(rows):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Benchmark naive/PyTorch/Triton attention")
-    parser.add_argument("--warmup", type=int, default=1000, help="Warmup iterations for triton.testing.do_bench")
-    parser.add_argument("--rep", type=int, default=10000, help="Measured iterations for triton.testing.do_bench")
+    parser.add_argument("--warmup", type=int, default=100, help="Warmup iterations for triton.testing.do_bench")
+    parser.add_argument("--rep", type=int, default=1000, help="Measured iterations for triton.testing.do_bench")
     parser.add_argument(
         "--implementations",
         nargs="+",
@@ -79,7 +81,13 @@ def parse_args():
     parser.add_argument("--k-tile-size", type=int, default=None, help="Override Triton K tile size")
     parser.add_argument("--pytorch-tile-size", type=int, default=None, help="Override PyTorch FlashAttention tile size")
     parser.add_argument("--batch-size", type=int, default=1, help="Batch size for benchmark inputs")
-    parser.add_argument("--n-heads", type=int, default=1, help="Number of attention heads to benchmark")
+    parser.add_argument("--n-heads", type=int, default=16, help="Number of attention heads to benchmark")
+    parser.add_argument(
+        "--plot-output",
+        type=str,
+        default=None,
+        help="Path to save the flash attention comparison plot",
+    )
     parser.add_argument(
         "--compile-pytorch-flash",
         action="store_true",
@@ -212,6 +220,85 @@ def benchmark_case(
     }
 
 
+def make_plot(results, output_path):
+    plot_rows = []
+    for row in results:
+        if row["implementation"] not in {"naive", "triton_flash"}:
+            continue
+        if row["status"] != "ok":
+            continue
+        plot_rows.append(
+            {
+                **row,
+                "fwd_ms_value": float(row["fwd_ms"]),
+                "bwd_ms_value": float(row["bwd_ms"]),
+                "total_ms": float(row["fwd_ms"]) + float(row["bwd_ms"]),
+            }
+        )
+
+    if not plot_rows:
+        print("\nNo torch/triton flash results available for plotting.")
+        return
+
+    dtypes = sorted({row["dtype"] for row in plot_rows})
+    shapes = sorted({(row["n_heads"], row["d_head"]) for row in plot_rows})
+    n_rows = len(dtypes)
+    n_cols = len(shapes)
+    fig, axes = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(5 * n_cols, 4 * n_rows),
+        squeeze=False,
+    )
+    colors = {
+        "naive": "#d95f02",
+        "triton_flash": "#1b9e77",
+    }
+    labels = {
+        "naive": "PyTorch Attention",
+        "triton_flash": "Triton FlashAttention",
+    }
+
+    for row_idx, dtype in enumerate(dtypes):
+        for col_idx, (n_heads, d_head) in enumerate(shapes):
+            ax = axes[row_idx][col_idx]
+            subset = [
+                row
+                for row in plot_rows
+                if row["dtype"] == dtype and row["n_heads"] == n_heads and row["d_head"] == d_head
+            ]
+            for impl_name in ("naive", "triton_flash"):
+                impl_rows = sorted(
+                    [row for row in subset if row["implementation"] == impl_name],
+                    key=lambda row: row["seq_len"],
+                )
+                if not impl_rows:
+                    continue
+                ax.plot(
+                    [row["seq_len"] for row in impl_rows],
+                    [row["total_ms"] for row in impl_rows],
+                    marker="o",
+                    linewidth=2,
+                    color=colors[impl_name],
+                    label=labels[impl_name],
+                )
+            ax.set_xscale("log", base=2)
+            ax.set_xlabel("Sequence Length")
+            ax.set_ylabel("Forward + Backward Time (ms)")
+            ax.set_title(f"dtype={dtype}, n_heads={n_heads}, d_head={d_head}")
+            ax.grid(True, alpha=0.3)
+
+    handles, legend_labels = axes[0][0].get_legend_handles_labels()
+    if handles:
+        fig.legend(handles, legend_labels, loc="upper center", ncol=len(legend_labels), frameon=False)
+    fig.suptitle("FlashAttention Benchmark: PyTorch vs Triton", y=0.98, fontsize=14)
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print(f"\nSaved plot to {output_path}")
+
+
 def main():
     args = parse_args()
     if args.seq_lens is not None:
@@ -290,6 +377,8 @@ def main():
 
     print("\nBenchmark Results:")
     print(to_markdown_table(results))
+    plot_output = Path(args.plot_output) if args.plot_output else Path(__file__).with_name("flash_attention_benchmark.png")
+    make_plot(results, plot_output)
 
 
 if __name__ == "__main__":
