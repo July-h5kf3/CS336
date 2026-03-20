@@ -51,6 +51,7 @@
 
 - [x] **Benchmarking and profiling harness**(3.12)
 - [x] **Flash Attention 2 Triton Kernel**(3.20)
+  - ![Attention](fig/attention.png)
 - [ ] **Distributed data parallel training**
 - [ ] **Optimizer state sharding**
 
