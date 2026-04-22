@@ -1,6 +1,6 @@
 import os
 import torch
-import torch.distrubuted as dist
+import torch.distributed as dist
 import torch.multiprocessing as mp
 
 def setup(rank, world_size):
