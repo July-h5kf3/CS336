@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 
 import torch.distributed as dist
+import torch.nn as nn
 import torch.multiprocessing as mp
 from torch.optim import AdamW
 from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors
@@ -15,10 +16,82 @@ from cs336_basics.Transformer import Transformer
 
 VOCAB_SIZE = 10000
 CONTEXT_LENGTH = 128
-BATCH_SIZE_PER_RANK = 1
+BATCH_SIZE_PER_RANK = 16
 NUM_STEPS = 300
 WARMUP_STEPS = 20
 
+
+class DDP(nn.Module):
+    def __init__(self, module,bucket_size_mb=10):
+        super().__init__()
+        self.module = module
+        self.world_size = dist.get_world_size()
+        self.bucket_size_mb = bucket_size_mb
+
+        with torch.no_grad():
+            for param in self.module.parameters():
+                dist.broadcast(param, src=0)
+        params = [p for p in self.module.parameters() if p.requires_grad]
+        params = list(reversed(params))
+        
+        self.buckets = []
+        current_bucket = []
+        current_size = 0
+
+        for param in params:
+            p_size = param.numel()
+            if current_bucket and current_size + p_size > bucket_size_mb * 1024 * 1024 // 4:
+                self.buckets.append(current_bucket)
+                current_bucket = []
+                current_size = 0
+            current_bucket.append(param)
+            current_size += p_size
+        if current_bucket:
+            self.buckets.append(current_bucket)
+        self.param2bucket = {}
+        for bucket_idx, bucket in enumerate(self.buckets):
+            for p in bucket:
+                self.param2bucket[p] = bucket_idx
+
+        self.bucket_ready_count = [0 for _ in self.buckets]
+        self.bucket_handles = [None for _ in self.buckets]
+        self.bucket_flat_grads = [None for _ in self.buckets]
+
+        for p in params:
+            if not p.requires_grad:
+                continue
+            def make_hook(p):
+                def hook(_):
+                    if p.grad is None:
+                        return
+                    bucket_idx = self.param2bucket[p]
+                    self.bucket_ready_count[bucket_idx] += 1
+                    if self.bucket_ready_count[bucket_idx] == len(self.buckets[bucket_idx]):
+                        grads = [param.grad for param in self.buckets[bucket_idx]]
+                        flat_grads = _flatten_dense_tensors(grads)
+                        handle = dist.all_reduce(flat_grads, op=dist.ReduceOp.SUM, async_op=True)
+                        self.bucket_flat_grads[bucket_idx] = flat_grads
+                        self.bucket_handles[bucket_idx] = handle
+                return hook
+            p.register_post_accumulate_grad_hook(make_hook(p))
+
+    def forward(self, *inputs, **kwargs):
+        return self.module(*inputs, **kwargs)
+    
+    def finish_gradient_synchronization(self):
+        for bucket_idx, handle in enumerate(self.bucket_handles):
+            if handle is None:
+                continue
+            handle.wait()
+            flat_grads = self.bucket_flat_grads[bucket_idx]
+            flat_grads /= self.world_size
+            grads = [p.grad for p in self.buckets[bucket_idx]]
+            synced_grads = _unflatten_dense_tensors(flat_grads, grads)
+            for param, grad in zip(self.buckets[bucket_idx], synced_grads):
+                param.grad.copy_(grad)
+            self.bucket_ready_count[bucket_idx] = 0
+            self.bucket_handles[bucket_idx] = None
+            self.bucket_flat_grads[bucket_idx] = None
 
 def setup(rank, world_size, backend, master_port):
     os.environ["MASTER_ADDR"] = "localhost"
@@ -41,7 +114,7 @@ def sync_device(device):
         torch.cuda.synchronize(device)
 
 
-def train_worker(rank, world_size, backend, use_flatten, master_port):
+def train_worker(rank, world_size, backend, use_flatten, use_async, master_port):
     torch.manual_seed(rank)
     setup(rank, world_size, backend, master_port)
     device = get_device(rank, backend)
@@ -53,9 +126,12 @@ def train_worker(rank, world_size, backend, use_flatten, master_port):
         num_heads=16,
         device=device,
     ).to(device)
-    with torch.no_grad():
-        for param in model.parameters():
-            dist.broadcast(param, src=0)
+    if use_async:
+        model = DDP(model, bucket_size_mb=10)
+    else:
+        with torch.no_grad():
+            for param in model.parameters():
+                dist.broadcast(param, src=0)
     optimizer = AdamW(model.parameters(), lr=1e-4, betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-2)
 
     local_tokens = torch.randint(
@@ -76,21 +152,24 @@ def train_worker(rank, world_size, backend, use_flatten, master_port):
         logits = model(local_tokens)
         loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), local_targets.reshape(-1))
         loss.backward()
-        if use_flatten:
-            params = [p for p in model.parameters() if p.grad is not None]
-            grads = [p.grad for p in params]
-            flat_grads = _flatten_dense_tensors(grads)
-            dist.all_reduce(flat_grads, op=dist.ReduceOp.SUM)
-            flat_grads /= world_size
-            synced_grads = _unflatten_dense_tensors(flat_grads, grads)
-            for param, grad in zip(params, synced_grads):
-                param.grad.copy_(grad)
+        if use_async:
+            model.finish_gradient_synchronization()
         else:
-            for param in model.parameters():
-                if param.grad is None:
-                    continue
-                dist.all_reduce(param.grad, op=dist.ReduceOp.SUM)
-                param.grad /= world_size
+            if use_flatten:
+                params = [p for p in model.parameters() if p.grad is not None]
+                grads = [p.grad for p in params]
+                flat_grads = _flatten_dense_tensors(grads)
+                dist.all_reduce(flat_grads, op=dist.ReduceOp.SUM)
+                flat_grads /= world_size
+                synced_grads = _unflatten_dense_tensors(flat_grads, grads)
+                for param, grad in zip(params, synced_grads):
+                    param.grad.copy_(grad)
+            else:
+                for param in model.parameters():
+                    if param.grad is None:
+                        continue
+                    dist.all_reduce(param.grad, op=dist.ReduceOp.SUM)
+                    param.grad /= world_size
         optimizer.step()
 
         sync_device(device)
@@ -103,7 +182,12 @@ def train_worker(rank, world_size, backend, use_flatten, master_port):
             step_times.append(step_time.item())
 
     if rank == 0:
-        label = "flattened all-reduce" if use_flatten else "per-parameter all-reduce"
+        if use_async:
+            label = "async per-parameter all-reduce"
+        elif use_flatten:
+            label = "flattened all-reduce"
+        else:
+            label = "per-parameter all-reduce"
         avg_time = sum(step_times) / len(step_times)
         print(f"{label}: {avg_time:.3f} s/step")
         print("model config: d_model=1600, d_ff=6400, num_layers=48, num_heads=25")
@@ -120,13 +204,19 @@ if __name__ == "__main__":
         backend = "gloo"
     mp.spawn(
         fn=train_worker,
-        args=(world_size, backend, False, 29500),
+        args=(world_size, backend, False, False, 29500),
         nprocs=world_size,
         join=True,
     )
     mp.spawn(
         fn=train_worker,
-        args=(world_size, backend, True, 29501),
+        args=(world_size, backend, True, False, 29501),
+        nprocs=world_size,
+        join=True,
+    )
+    mp.spawn(
+        fn=train_worker,
+        args=(world_size, backend, False, True, 29502),
         nprocs=world_size,
         join=True,
     )
