@@ -46,14 +46,16 @@
   - *Note: 仅在 TinyStories 上进行最终训练与测试，未进行额外消融实验。*
   - ![Inference](fig/final.png)
 
-### 2. Systems (Assignment 2)
+### 2. Systems (Assignment 2)(4.23)
 > 🚧 进行中...
 
 - [x] **Benchmarking and profiling harness**(3.12)
 - [x] **Flash Attention 2 Triton Kernel**(3.20)
   - ![Attention](fig/attention.png)
-- [ ] **Distributed data parallel training**
-- [ ] **Optimizer state sharding**
+- [x] **Distributed data parallel training**(4.23)
+  - ![](fig/DDP.png)
+- [x] **Optimizer state sharding**(4.23)
+  - ![](fig/optimizer_sharding.png)
 
 ### 3. Scaling
 - [ ] (待定)
