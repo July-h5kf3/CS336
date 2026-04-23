@@ -5,6 +5,7 @@ from einops import rearrange
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.optim import AdamW
+from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors
 
 import os
 from copy import deepcopy
@@ -97,6 +98,67 @@ def distributed_train(rank, world_size, backend, x_rand, y_rand):
             print(f"param {i}: max_diff = {max_diff:.8e}")
 
     dist.destroy_process_group()
+def reduce_less_distributed_train(rank, world_size, backend, x_rand, y_rand):
+    torch.manual_seed(rank)
+    setup(rank, world_size, backend)
+    device = get_device(rank, backend)
+    model = ToyMLP().to(device)
+    x_rand = x_rand.to(device)
+    y_rand = y_rand.to(device)
+
+    params = [p.data for p in model.parameters()]
+    flat_params = _flatten_dense_tensors(params)
+    dist.broadcast(flat_params, src=0)
+    params = _unflatten_dense_tensors(flat_params, params)
+    with torch.no_grad():
+        for p, p_new in zip(model.parameters(), params):
+            p.data.copy_(p_new)
+    if rank == 0:
+        model_baseline = deepcopy(model)
+        baseline_opt = AdamW(
+            model_baseline.parameters(),
+            lr=1e-4,
+            betas=(0.9, 0.999),
+            eps=1e-8,
+            weight_decay=1e-2,
+        )
+        loss_fn = nn.MSELoss(reduction="mean")
+        baseline_opt.zero_grad()
+        pred = model_baseline(x_rand)
+        loss = loss_fn(pred, y_rand)
+        loss.backward()
+        baseline_opt.step()
+    
+    x_local = rearrange(x_rand, "(d b) f -> d b f", d=world_size)[rank]
+    y_local = rearrange(y_rand, "(d b) f -> d b f", d=world_size)[rank]
+    optimizer = AdamW(
+        model.parameters(),
+        lr=1e-4,
+        betas=(0.9, 0.999),
+        eps=1e-8,
+        weight_decay=1e-2,
+    )
+    loss_fn = nn.MSELoss(reduction="mean")
+    optimizer.zero_grad()
+    pred = model(x_local)
+    loss = loss_fn(pred, y_local)
+    loss.backward()
+    params = [p for p in model.parameters() if p.grad is not None]
+    grads = [p.grad for p in params]
+    flat_grads = _flatten_dense_tensors(grads)
+    dist.all_reduce(flat_grads, op=dist.ReduceOp.SUM)
+    flat_grads /= world_size
+    grads = _unflatten_dense_tensors(flat_grads, grads)
+    with torch.no_grad():
+        for p, g in zip(params, grads):
+            p.grad.copy_(g)
+    optimizer.step()
+    dist.barrier()
+
+    if rank == 0:
+        for i, (p_base, p_ddp) in enumerate(zip(model_baseline.parameters(), model.parameters())):
+            max_diff = (p_base - p_ddp).abs().max().item()
+            print(f"param {i}: max_diff = {max_diff:.8e}")
 
 
 if __name__ == "__main__":
@@ -110,4 +172,5 @@ if __name__ == "__main__":
     batch_size = 128
     x_rand = torch.randn(batch_size, 16)
     y_rand = torch.randn(batch_size, 4)
-    mp.spawn(fn=distributed_train, args=(world_size, backend, x_rand, y_rand), nprocs=world_size, join=True)
+    # mp.spawn(fn=distributed_train, args=(world_size, backend, x_rand, y_rand), nprocs=world_size, join=True)
+    mp.spawn(fn=reduce_less_distributed_train, args=(world_size, backend, x_rand, y_rand), nprocs=world_size, join=True)
