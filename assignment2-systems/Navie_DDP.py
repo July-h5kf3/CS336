@@ -9,29 +9,46 @@ from torch.optim import AdamW
 import os
 from copy import deepcopy
 
+
 class ToyMLP(nn.Module):
-    def __init__(self,d_in=16,d_hidden=32,d_out=4):
+    def __init__(self, d_in=16, d_hidden=32, d_out=4):
         super().__init__()
-        self.fc1 = nn.Linear(d_in,d_hidden)
+        self.fc1 = nn.Linear(d_in, d_hidden)
         self.act = nn.ReLU()
-        self.fc2 = nn.Linear(d_hidden,d_out)
-    def forward(self,x):
+        self.fc2 = nn.Linear(d_hidden, d_out)
+
+    def forward(self, x):
         x = self.fc2(self.act(self.fc1(x)))
         return x
+
 
 def setup(rank, world_size, backend):
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = "29500"
-    dist.init_process_group(backend, rank=rank, world_size=world_size)
+    init_kwargs = {"backend": backend, "rank": rank, "world_size": world_size}
+    if backend == "nccl":
+        init_kwargs["device_id"] = torch.device(f"cuda:{rank}")
+    dist.init_process_group(**init_kwargs)
 
-def distributed_train(rank,world_size,backend,x_rand,y_rand):
+
+def get_device(rank, backend):
+    if backend == "nccl":
+        torch.cuda.set_device(rank)
+        return torch.device(f"cuda:{rank}")
+    return torch.device("cpu")
+
+
+def distributed_train(rank, world_size, backend, x_rand, y_rand):
     torch.manual_seed(rank)
-    setup(rank,world_size,backend)
-    model = ToyMLP()
+    setup(rank, world_size, backend)
+    device = get_device(rank, backend)
+    model = ToyMLP().to(device)
+    x_rand = x_rand.to(device)
+    y_rand = y_rand.to(device)
 
     with torch.no_grad():
         for param in model.parameters():
-            dist.broadcast(param,src =0)
+            dist.broadcast(param, src=0)
 
     if rank == 0:
         model_baseline = deepcopy(model)
@@ -84,10 +101,13 @@ def distributed_train(rank,world_size,backend,x_rand,y_rand):
 
 if __name__ == "__main__":
     torch.manual_seed(0)
-    world_size = 4
-    backend = "gloo"
+    if torch.cuda.is_available():
+        world_size = torch.cuda.device_count()
+        backend = "nccl"
+    else:
+        world_size = 4
+        backend = "gloo"
     batch_size = 128
     x_rand = torch.randn(batch_size, 16)
     y_rand = torch.randn(batch_size, 4)
     mp.spawn(fn=distributed_train, args=(world_size, backend, x_rand, y_rand), nprocs=world_size, join=True)
-    

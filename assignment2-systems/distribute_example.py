@@ -11,7 +11,7 @@ import torch.multiprocessing as mp
 
 
 BYTES_PER_MB = 1024 * 1024
-WORLD_SIZES = [2, 4, 6, 8]
+WORLD_SIZES = [2, 4]
 TENSOR_SIZES_MB = [1, 10, 100, 1024]
 
 
