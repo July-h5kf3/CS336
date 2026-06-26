@@ -23,11 +23,12 @@
 
 ## 🚀 快速开始
 
-建议使用 Python 3.11+ 环境。仓库使用根目录下的 **单一共享 uv 环境**，避免 `assignment1` 和 `assignment2` 分别维护独立环境。
+建议使用 Python 3.11+ 环境。仓库使用根目录下的 **单一共享 uv 环境**，避免各个 assignment 分别维护独立环境。根环境按 Linux x86_64/CUDA 机器解析，包含 assignment5 所需的 `vllm==0.7.2`、`flash-attn==2.7.4.post1` 等依赖。
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.local/bin/env
+uv sync --no-install-package flash-attn
 uv sync
 ```
 
@@ -36,6 +37,7 @@ uv sync
 ```bash
 uv run pytest
 uv run --project assignment2-systems --project .. pytest assignment2-systems/tests/test_sharded_optimizer.py -q
+uv run --project assignment5-alignment-spring2025 --project .. pytest assignment5-alignment-spring2025/tests -q
 ```
 
 ## 📊 进度说明
@@ -81,7 +83,6 @@ uv run --project assignment2-systems --project .. pytest assignment2-systems/tes
 - [ ] (待定)
 
 ### 5. Alignment and Reasoning RL
-- [ ] (待定)
 
 ---
 

@@ -6,3 +6,9 @@ index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 extra-index-url = ["https://download.pytorch.org/whl/nightly/cu124"]
 index-strategy = "unsafe-best-match"
 concurrent-downloads = 2
+no-build-isolation-package = ["flash-attn"]
+
+[[dependency-metadata]]
+name = "flash-attn"
+version = "2.7.4.post1"
+requires-dist = ["torch", "einops", "setuptools"]
