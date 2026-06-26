@@ -2,9 +2,8 @@
 name = "cs336-workspace"
 version = "0.1.0"
 description = "Shared environment for CS336 assignments"
-requires-python = ">=3.11,<3.13"
+requires-python = ">=3.10,<3.13"
 dependencies = [
-    "alignment",
     "cs336-basics",
     "cs336-systems",
 ]
@@ -14,7 +13,5 @@ package = false
 environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
 
 [tool.uv.sources]
-alignment = { path = "assignment5-alignment-spring2025", editable = true }
-alpaca-eval = { git = "https://github.com/nelson-liu/alpaca_eval.git", rev = "forward_kwargs_to_vllm" }
 cs336-basics = { path = "assignment1-basics", editable = true }
 cs336-systems = { path = "assignment2-systems", editable = true }

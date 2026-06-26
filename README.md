@@ -1,6 +1,6 @@
 # 📚 CS336: Large Language Model Systems
 
-![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 这是我的 Stanford CS336 课程作业仓库，记录了从零开始实现大语言模型系统的过程，包括基础模型组件、训练流水线、Triton 内核、分布式训练与优化器状态分片等内容。
@@ -23,11 +23,18 @@
 
 ## 🚀 快速开始
 
-建议使用 Python 3.11+ 环境。仓库使用根目录下的 **单一共享 uv 环境**，避免各个 assignment 分别维护独立环境。根环境按 Linux x86_64/CUDA 机器解析，包含 assignment5 所需的 `vllm==0.7.2`、`flash-attn==2.7.4.post1` 等依赖。
+建议使用 Python 3.10+ 环境。仓库根目录的 uv 环境只用于 Assignment 1/2；Assignment 5 依赖较重，包含 `vllm==0.7.2`、`flash-attn==2.7.4.post1` 等包，因此在 `assignment5-alignment-spring2025/` 目录下单独安装。
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.local/bin/env
+uv sync
+```
+
+Assignment 5 单独安装：
+
+```bash
+cd assignment5-alignment-spring2025
 uv sync --no-install-package flash-attn
 uv sync
 ```
@@ -37,7 +44,7 @@ uv sync
 ```bash
 uv run pytest
 uv run --project assignment2-systems --project .. pytest assignment2-systems/tests/test_sharded_optimizer.py -q
-uv run --project assignment5-alignment-spring2025 --project .. pytest assignment5-alignment-spring2025/tests -q
+cd assignment5-alignment-spring2025 && uv run pytest tests -q
 ```
 
 ## 📊 进度说明
