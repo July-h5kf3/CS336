@@ -23,7 +23,7 @@
 
 ## 🚀 快速开始
 
-建议使用 Python 3.10+ 环境。仓库根目录的 uv 环境只用于 Assignment 1/2；Assignment 5 依赖较重，包含 `vllm==0.7.2`、`flash-attn==2.7.4.post1` 等包，因此在 `assignment5-alignment-spring2025/` 目录下单独安装。
+建议使用 Python 3.10+ 环境。仓库根目录的 uv 环境只用于 Assignment 1/2；Assignment 5 依赖较重，包含 `vllm==0.7.2` 等包，因此在 `assignment5-alignment-spring2025/` 目录下单独安装。`flash-attn` 不纳入 uv 依赖图，如需使用请在 A5 环境中通过 wheel 手动安装。
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -35,7 +35,6 @@ Assignment 5 单独安装：
 
 ```bash
 cd assignment5-alignment-spring2025
-uv sync --no-install-package flash-attn
 uv sync
 ```
 

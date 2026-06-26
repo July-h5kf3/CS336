@@ -12,11 +12,12 @@ raise a GitHub issue or open a pull request with a fix.
 
 As in previous assignments, we use `uv` to manage dependencies.
 
-1. Install all packages except `flash-attn`, then all packages (`flash-attn` is weird)
+1. Install the uv-managed dependencies:
 ```
-uv sync --no-install-package flash-attn
 uv sync
 ```
+
+If you need `flash-attn`, install it manually from a wheel after `uv sync`.
 
 2. Run unit tests:
 
@@ -27,4 +28,3 @@ uv run pytest
 Initially, all tests should fail with `NotImplementedError`s.
 To connect your implementation to the tests, complete the
 functions in [./tests/adapters.py](./tests/adapters.py).
-
