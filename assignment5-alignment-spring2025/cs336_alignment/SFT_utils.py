@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from transformers import AutoTokenizer
 
 def tokenizer_prompt_and_output(
@@ -44,3 +45,11 @@ def tokenizer_prompt_and_output(
         "labels": labels,
         "response_mask": response_mask
     }
+def compute_entropy(
+    logits: torch.Tensor,
+):
+    #logits: [bs,s,dim]
+    log_probs = F.log_softmax(logits,dim=-1)
+    probs = log_probs.exp()
+    return -(probs * log_probs).sum(dim=-1)
+    
