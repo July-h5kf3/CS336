@@ -51,7 +51,7 @@ def main():
     gt = []
     prompt_template = Path("cs336_alignment/prompts/r1_zero.prompt").read_text()
     for ex in examples:
-        problem = ex["problem"]
+        problem = ex["question"]
         answer = ex["answer"].split("####")[-1].strip()
         prompt = prompt_template.format(question=problem)
         prompts.append(prompt)

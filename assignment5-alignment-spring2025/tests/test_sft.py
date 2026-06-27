@@ -1,4 +1,8 @@
+import json
+
 import torch
+
+import cs336_alignment.SFT_utils as sft_utils
 
 from .adapters import (
     run_compute_entropy as compute_entropy,
@@ -131,3 +135,52 @@ def test_sft_microbatch_train_step_10_steps(
         "policy_log_probs_grad": torch.stack(grad_list),
     }
     numpy_snapshot.assert_match(output)
+
+
+def test_log_generations_uses_tqdm(monkeypatch, tmp_path):
+    tqdm_calls = []
+
+    def fake_tqdm(iterable, **kwargs):
+        tqdm_calls.append(kwargs)
+        return iterable
+
+    class FakeGeneration:
+        def __init__(self, text):
+            self.outputs = [
+                type(
+                    "FakeOutput",
+                    (),
+                    {
+                        "text": text,
+                        "token_ids": [1, 2],
+                        "cumulative_logprob": -4.0,
+                    },
+                )()
+            ]
+
+    class FakeVllmModel:
+        def generate(self, prompts, sampling_params):
+            del sampling_params
+            return [FakeGeneration("ok") for _ in prompts]
+
+    def fake_reward_fn(response, ground_truth):
+        del response, ground_truth
+        return {"reward": 1.0, "format_reward": 1.0, "answer_reward": 1.0}
+
+    monkeypatch.setattr(sft_utils, "tqdm", fake_tqdm)
+
+    output_path = tmp_path / "generations.json"
+
+    result = sft_utils.log_generations(
+        vllm_model=FakeVllmModel(),
+        examples=[{"prompt": "p", "ground_truth": "ok"}],
+        reward_fn=fake_reward_fn,
+        sampling_params=None,
+        output_path=output_path,
+    )
+
+    saved_result = json.loads(output_path.read_text())
+    assert result is None
+    assert saved_result["summary"]["mean_reward"] == 1.0
+    assert saved_result["summary"]["mean_response_logprob"] == -2.0
+    assert tqdm_calls == [{"desc": "Logging generations", "total": 1}]
