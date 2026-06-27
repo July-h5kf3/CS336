@@ -1,6 +1,7 @@
 from vllm import LLM,SamplingParams
 from collections import Counter
 from cs336_alignment.drgrpo_grader import r1_zero_reward_fn
+from cs336_alignment.SFT import load_gsm8k_sft_examples
 import json
 from typing import Callable
 from pathlib import Path
@@ -42,20 +43,12 @@ def evaluate_vllm(
     with output_path.open("w") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
 def main():
-    examples = []
-    with open("data/gsm8k/test.jsonl") as f:
-        for line in f:
-            if line.strip():
-                examples.append(json.loads(line))
-    prompts = []
-    gt = []
-    prompt_template = Path("cs336_alignment/prompts/r1_zero.prompt").read_text()
-    for ex in examples:
-        problem = ex["question"]
-        answer = ex["answer"].split("####")[-1].strip()
-        prompt = prompt_template.format(question=problem)
-        prompts.append(prompt)
-        gt.append(answer)
+    examples = load_gsm8k_sft_examples(
+        "data/gsm8k/test.jsonl",
+        "cs336_alignment/prompts/r1_zero.prompt",
+    )
+    prompts = [example["prompt"] for example in examples]
+    gt = [example["ground_truth"] for example in examples]
     sampling_params = SamplingParams(
         temperature = 1.0,
         top_p = 1.0,

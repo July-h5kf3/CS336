@@ -12,6 +12,7 @@ dependencies = [
     "pylatexenc==2.10",
     "notebook>=7.4.2",
     "pytest>=8.3.5",
+    "PyYAML>=6.0.2",
     "torch",
     "tqdm>=4.67.1",
     "transformers>=4.50.0",

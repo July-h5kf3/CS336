@@ -1,0 +1,25 @@
+model: /data/a5-alignment/models/Qwen2.5-Math-1.5B
+train_path: data/gsm8k/train.jsonl
+eval_path: data/gsm8k/test.jsonl
+prompt_template: cs336_alignment/prompts/r1_zero.prompt
+output_dir: results/sft_gsm8k_policy
+eval_output_path: results/sft_gsm8k_test_100.json
+device: cuda
+epochs: 1
+micro_batch_size: 1
+gradient_accumulation_steps: 2
+learning_rate: 1.0e-5
+normalize_constant: 1.0
+max_grad_norm: 1.0
+max_steps:
+max_train_examples:
+eval_every_steps: 100
+max_eval_examples: 100
+eval_temperature: 1.0
+eval_top_p: 1.0
+eval_max_tokens: 1024
+seed: 0
+wandb_enabled: true
+wandb_entity: acd66-nankai-university
+wandb_project: CS336 assignment5
+wandb_run_name: gsm8k-sft
