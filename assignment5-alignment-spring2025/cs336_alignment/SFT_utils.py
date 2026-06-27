@@ -73,7 +73,30 @@ def get_response_log_probs(
         result["token_entropy"] = compute_entropy(logits)
     return result
 
+def masked_normalize(
+    tensor: torch.Tensor,
+    mask: torch.Tensor,
+    normalize_constant: float,
+    dim: int | None = None,
+):
+    masked_sum = tensor.masked_fill(~mask,0).sum(dim = dim)
+    return masked_sum / normalize_constant
 
+def sft_microbatch_train_step(
+    policy_log_probs: torch.Tensor,
+    response_mask: torch.Tensor,
+    gradient_accumulation_steps:int,
+    normalize_constant: float = 1.0,
+)-> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+    loss = -masked_normalize(
+        tensor= policy_log_probs,
+        mask = response_mask,
+        normalize_constant= normalize_constant
+        dim = -1,
+    ).mean()
+    loss = loss / gradient_accumulation_steps
+    loss.backward()
+    return loss,{}
 
 
     
