@@ -65,12 +65,12 @@ def get_response_log_probs(
 ):
     logits = model(input_ids).logits
 
-    all_log_probs = F.log_softmax(logits,dim = -1)
-    token_log_probs = torch.gather(
-        all_log_probs,
+    token_logits = torch.gather(
+        logits,
         dim = -1,
         index = labels.unsqueeze(-1),
     ).squeeze(-1)
+    token_log_probs = token_logits - torch.logsumexp(logits, dim=-1)
 
     result = {"log_probs": token_log_probs}
     if return_token_entropy:

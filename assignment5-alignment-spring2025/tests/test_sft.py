@@ -40,6 +40,39 @@ def test_get_response_log_probs(
     )
     numpy_snapshot.assert_match(output)
 
+
+def test_get_response_log_probs_without_full_log_softmax(monkeypatch):
+    class FakeModel:
+        def __call__(self, input_ids):
+            del input_ids
+            logits = torch.tensor(
+                [
+                    [
+                        [1.0, 2.0, 3.0],
+                        [0.5, 0.0, -0.5],
+                    ]
+                ]
+            )
+            return type("FakeOutput", (), {"logits": logits})()
+
+    def fail_log_softmax(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("get_response_log_probs should not materialize full log_softmax")
+
+    monkeypatch.setattr(sft_utils.F, "log_softmax", fail_log_softmax)
+
+    result = sft_utils.get_response_log_probs(
+        model=FakeModel(),
+        input_ids=torch.tensor([[0, 1]]),
+        labels=torch.tensor([[2, 0]]),
+    )
+
+    logits = FakeModel()(None).logits
+    expected = torch.gather(logits, -1, torch.tensor([[[2], [0]]])).squeeze(-1)
+    expected = expected - torch.logsumexp(logits, dim=-1)
+    torch.testing.assert_close(result["log_probs"], expected)
+
+
 def test_masked_normalize_dim0(numpy_snapshot, tensor, mask, normalize_constant):
     output = masked_normalize(
         tensor=tensor,
@@ -187,16 +220,74 @@ def test_log_generations_uses_tqdm(monkeypatch, tmp_path):
     assert tqdm_calls == [{"desc": "Logging generations", "total": 1}]
 
 
-def test_format_gsm8k_target_matches_r1_zero_prompt():
-    from cs336_alignment import SFT as sft
+def test_load_reason_sft_examples(tmp_path):
+    from cs336_alignment import dataset as sft_dataset
 
-    target = sft.format_gsm8k_target("2 + 2 = <<2+2=4>>4\n#### 4")
+    data_path = tmp_path / "reason.json"
+    prompt_path = tmp_path / "prompt.txt"
+    data_path.write_text(json.dumps([
+        {
+            "problem": "What is 2+2?",
+            "reasoning_trace": "2+2=4.</think> <answer>4</answer>",
+            "expected_answer": "4",
+        }
+    ]))
+    prompt_path.write_text("Question: {question}\nAssistant: <think>")
 
-    assert target == "2 + 2 = <<2+2=4>>4\n</think> <answer>4</answer>"
+    examples = sft_dataset.load_sft_reason_examples(data_path, prompt_path, limit=1)
+
+    assert examples == [
+        {
+            "prompt": "Question: What is 2+2?\nAssistant: <think>",
+            "output": "2+2=4.</think> <answer>4</answer>",
+            "ground_truth": "4",
+        }
+    ]
 
 
-def test_load_gsm8k_sft_examples(tmp_path):
-    from cs336_alignment import SFT as sft
+def test_load_reason_eval_examples_without_output(tmp_path):
+    from cs336_alignment import dataset as sft_dataset
+
+    data_path = tmp_path / "reason_val.json"
+    prompt_path = tmp_path / "prompt.txt"
+    data_path.write_text(json.dumps([
+        {
+            "problem": "What is 2+2?",
+            "expected_answer": "4",
+        }
+    ]))
+    prompt_path.write_text("Question: {question}\nAssistant: <think>")
+
+    examples = sft_dataset.load_sft_reason_examples(data_path, prompt_path, limit=1)
+
+    assert examples == [
+        {
+            "prompt": "Question: What is 2+2?\nAssistant: <think>",
+            "ground_truth": "4",
+        }
+    ]
+
+
+def test_load_reason_examples_stringifies_list_ground_truth(tmp_path):
+    from cs336_alignment import dataset as sft_dataset
+
+    data_path = tmp_path / "reason_val.json"
+    prompt_path = tmp_path / "prompt.txt"
+    data_path.write_text(json.dumps([
+        {
+            "problem": "Find the interval.",
+            "expected_answer": [-2, 0],
+        }
+    ]))
+    prompt_path.write_text("Question: {question}\nAssistant: <think>")
+
+    examples = sft_dataset.load_sft_reason_examples(data_path, prompt_path, limit=1)
+
+    assert examples[0]["ground_truth"] == "[-2, 0]"
+
+
+def test_load_gsm8k_examples(tmp_path):
+    from cs336_alignment import dataset as sft_dataset
 
     data_path = tmp_path / "gsm8k.jsonl"
     prompt_path = tmp_path / "prompt.txt"
@@ -206,7 +297,7 @@ def test_load_gsm8k_sft_examples(tmp_path):
     )
     prompt_path.write_text("Question: {question}\nAssistant: <think>")
 
-    examples = sft.load_gsm8k_sft_examples(data_path, prompt_path, limit=1)
+    examples = sft_dataset.load_gsm8k_examples(data_path, prompt_path, limit=1)
 
     assert examples == [
         {
@@ -217,14 +308,62 @@ def test_load_gsm8k_sft_examples(tmp_path):
     ]
 
 
+def test_build_sft_dataset_selects_dataset_type(tmp_path):
+    from cs336_alignment import dataset as sft_dataset
+
+    data_path = tmp_path / "reason.json"
+    prompt_path = tmp_path / "prompt.txt"
+    data_path.write_text(json.dumps([
+        {
+            "problem": "What is 2+2?",
+            "reasoning_trace": "2+2=4.</think> <answer>4</answer>",
+            "expected_answer": "4",
+        }
+    ]))
+    prompt_path.write_text("Question: {question}\nAssistant: <think>")
+
+    dataset = sft_dataset.build_sft_dataset(
+        dataset_name="sft_reason",
+        data_path=data_path,
+        prompt_template_path=prompt_path,
+        limit=1,
+    )
+
+    assert len(dataset) == 1
+    assert dataset[0]["ground_truth"] == "4"
+    assert dataset[0]["output"] == "2+2=4.</think> <answer>4</answer>"
+
+
+def test_build_sft_dataloader_returns_microbatch_list(tmp_path):
+    from cs336_alignment import dataset as sft_dataset
+
+    dataset = sft_dataset.SFTExampleDataset([
+        {"prompt": "p0", "output": "o0", "ground_truth": "0"},
+        {"prompt": "p1", "output": "o1", "ground_truth": "1"},
+    ])
+
+    dataloader = sft_dataset.build_sft_dataloader(
+        dataset,
+        micro_batch_size=2,
+        shuffle=False,
+        seed=0,
+        num_workers=0,
+    )
+
+    assert next(iter(dataloader)) == [
+        {"prompt": "p0", "output": "o0", "ground_truth": "0"},
+        {"prompt": "p1", "output": "o1", "ground_truth": "1"},
+    ]
+
+
 def test_clip_gradients_caps_global_norm():
-    from cs336_alignment import SFT as sft
+    from cs336_alignment import train_utils
 
     model = torch.nn.Linear(2, 1)
     for parameter in model.parameters():
         parameter.grad = torch.full_like(parameter, 10.0)
 
-    sft.clip_gradients(model, max_grad_norm=1.0)
+    train_utils.clip_gradients(model, max_grad_norm=1.0)
 
     grad_norm = torch.linalg.vector_norm(
         torch.stack(
@@ -239,7 +378,7 @@ def test_clip_gradients_caps_global_norm():
 
 
 def test_load_config_uses_yaml_without_defaults(tmp_path):
-    from cs336_alignment import SFT as sft
+    from cs336_alignment import train_utils
 
     config_path = tmp_path / "sft.yaml"
     config_path.write_text(
@@ -253,7 +392,7 @@ def test_load_config_uses_yaml_without_defaults(tmp_path):
         )
     )
 
-    config = sft.load_config(config_path)
+    config = train_utils.load_config(config_path)
 
     assert config.model == "tests/fixtures/tiny-gpt2"
     assert config.epochs == 2
@@ -264,21 +403,21 @@ def test_load_config_uses_yaml_without_defaults(tmp_path):
 def test_step_paths_include_global_step(tmp_path):
     from types import SimpleNamespace
 
-    from cs336_alignment import SFT as sft
+    from cs336_alignment import train_utils
 
     config = SimpleNamespace(
         output_dir=str(tmp_path / "policy"),
         eval_output_path=str(tmp_path / "eval.json"),
     )
 
-    assert sft.checkpoint_path_for_step(config, 12) == tmp_path / "policy" / "checkpoint-step-12"
-    assert sft.eval_output_path_for_step(config, 12) == tmp_path / "eval_step_12.json"
+    assert train_utils.checkpoint_path_for_step(config, 12) == tmp_path / "policy" / "checkpoint-step-12"
+    assert train_utils.eval_output_path_for_step(config, 12) == tmp_path / "eval_step_12.json"
 
 
 def test_save_checkpoint_uses_global_step(tmp_path):
     from types import SimpleNamespace
 
-    from cs336_alignment import SFT as sft
+    from cs336_alignment import train_utils
 
     class FakeModel:
         def save_pretrained(self, path):
@@ -290,7 +429,7 @@ def test_save_checkpoint_uses_global_step(tmp_path):
 
     config = SimpleNamespace(output_dir=str(tmp_path / "policy"))
 
-    checkpoint_path = sft.save_checkpoint(
+    checkpoint_path = train_utils.save_checkpoint(
         config,
         model=FakeModel(),
         tokenizer=FakeTokenizer(),
@@ -303,13 +442,13 @@ def test_save_checkpoint_uses_global_step(tmp_path):
 
 
 def test_average_loss_for_logging_undoes_accumulation_scaling():
-    from cs336_alignment import SFT as sft
+    from cs336_alignment import train_utils
 
-    assert sft.average_loss_for_logging([0.5, 1.0], gradient_accumulation_steps=4) == 3.0
+    assert train_utils.average_loss_for_logging([0.5, 1.0], gradient_accumulation_steps=4) == 3.0
 
 
 def test_log_train_metrics_to_wandb():
-    from cs336_alignment import SFT as sft
+    from cs336_alignment import train_utils
 
     class FakeRun:
         def __init__(self):
@@ -320,7 +459,7 @@ def test_log_train_metrics_to_wandb():
 
     run = FakeRun()
 
-    sft.log_train_metrics(run, global_step=5, train_loss=2.5, learning_rate=1e-5)
+    train_utils.log_train_metrics(run, global_step=5, train_loss=2.5, learning_rate=1e-5)
 
     assert run.logged == [
         (
@@ -336,7 +475,7 @@ def test_log_train_metrics_to_wandb():
 def test_init_wandb_uses_entity_project_and_name(monkeypatch):
     from types import SimpleNamespace
 
-    from cs336_alignment import SFT as sft
+    from cs336_alignment import train_utils
 
     calls = []
 
@@ -344,7 +483,7 @@ def test_init_wandb_uses_entity_project_and_name(monkeypatch):
         calls.append(kwargs)
         return object()
 
-    monkeypatch.setattr(sft.wandb, "init", fake_init)
+    monkeypatch.setattr(train_utils.wandb, "init", fake_init)
 
     config = SimpleNamespace(
         wandb_enabled=True,
@@ -353,7 +492,7 @@ def test_init_wandb_uses_entity_project_and_name(monkeypatch):
         wandb_run_name="gsm8k-sft",
     )
 
-    sft.init_wandb(config)
+    train_utils.init_wandb(config)
 
     assert calls == [
         {
@@ -395,7 +534,7 @@ def test_run_eval_and_log_uses_global_step(monkeypatch, tmp_path):
 
 
 def test_log_eval_metrics_to_wandb(tmp_path):
-    from cs336_alignment import SFT as sft
+    from cs336_alignment import train_utils
 
     class FakeRun:
         def __init__(self):
@@ -420,7 +559,7 @@ def test_log_eval_metrics_to_wandb(tmp_path):
     )
     run = FakeRun()
 
-    sft.log_eval_metrics(run, eval_path, global_step=10)
+    train_utils.log_eval_metrics(run, eval_path, global_step=10)
 
     assert run.logged == [
         (
